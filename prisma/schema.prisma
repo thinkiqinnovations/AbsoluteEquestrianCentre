@@ -1,0 +1,88 @@
+generator client { provider = "prisma-client-js" }
+
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+
+enum RiderLevel { BEGINNER INTERMEDIATE ADVANCED }
+enum LessonType { PRIVATE GROUP PART_BOARD_RIDE }
+enum Discipline { FLAT JUMP }
+enum LessonStatus { DRAFT CONFIRMED COMPLETED CANCELLED }
+
+model Horse {
+  id String @id @default(cuid())
+  name String
+  active Boolean @default(true)
+  description String?
+  walkCapable Boolean @default(true)
+  trotCapable Boolean @default(true)
+  canterCapable Boolean @default(false)
+  supportsFlat Boolean @default(true)
+  supportsJumping Boolean @default(false)
+  minimumRiderLevel RiderLevel
+  maximumRiderLevel RiderLevel
+  maximumDailyRideUnits Decimal @default(1.5) @db.Decimal(4, 2)
+  notes String?
+  preferences RiderHorsePreference[]
+  lessons Lesson[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Rider {
+  id String @id @default(cuid())
+  firstName String
+  lastName String
+  active Boolean @default(true)
+  overallLevel RiderLevel
+  flatLevel RiderLevel
+  jumpLevel RiderLevel
+  notes String?
+  preferences RiderHorsePreference[]
+  lessons Lesson[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RiderHorsePreference {
+  riderId String
+  horseId String
+  preferenceOrder Int
+  notes String?
+  rider Rider @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  horse Horse @relation(fields: [horseId], references: [id], onDelete: Cascade)
+  @@id([riderId, horseId])
+  @@unique([riderId, preferenceOrder])
+}
+
+model Coach {
+  id String @id @default(cuid())
+  firstName String
+  lastName String
+  active Boolean @default(true)
+  notes String?
+  lessons Lesson[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Lesson {
+  id String @id @default(cuid())
+  date DateTime @db.Date
+  startTime String
+  endTime String
+  riderId String
+  horseId String
+  coachId String
+  lessonType LessonType
+  discipline Discipline
+  rideUnits Decimal @db.Decimal(4, 2)
+  status LessonStatus
+  notes String?
+  rider Rider @relation(fields: [riderId], references: [id])
+  horse Horse @relation(fields: [horseId], references: [id])
+  coach Coach @relation(fields: [coachId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([date, horseId])
+  @@index([date, riderId])
+  @@index([date, coachId])
+}
