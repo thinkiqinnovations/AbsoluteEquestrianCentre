@@ -65,7 +65,7 @@ See [deployguide.md](deployguide.md) for the full Supabase, Render, verification
    - the direct connection string for `DIRECT_URL`.
 2. In Render, create a Blueprint from this GitHub repository. `render.yaml` supplies the build, migration, start, health-check, and Node environment configuration.
 3. Enter `DATABASE_URL` and `DIRECT_URL` as secret Render environment variables. Do not commit them.
-4. Use the `starter` Render plan (configured in `render.yaml`) for an always-on service. Change the plan only if you intentionally accept free-tier sleeping behavior.
+4. The Blueprint uses Render's `free` plan for a no-cost pilot. It sleeps after inactivity; use a paid always-on plan before staff depend on the service day to day.
 5. Point the Namecheap domain to the Render service according to Render’s custom-domain instructions. Express serves both the application and its API under that domain, so `CORS_ORIGIN` is optional. Set it only if a separate frontend origin is introduced.
 
 For local database development, copy `.env.example` to `.env`, add the two Supabase URLs, then run:

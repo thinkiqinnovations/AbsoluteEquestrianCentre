@@ -2,7 +2,7 @@ services:
   - type: web
     name: absolute-equestrian-scheduler
     runtime: node
-    plan: starter
+    plan: free
     buildCommand: pnpm install --frozen-lockfile && pnpm prisma:generate && pnpm build
     preDeployCommand: pnpm prisma:migrate:deploy
     startCommand: pnpm start

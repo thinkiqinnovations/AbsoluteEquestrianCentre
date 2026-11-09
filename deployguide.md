@@ -6,7 +6,7 @@ This guide deploys Absolute Equestrian Scheduler as one Node.js service on Rende
 
 - A GitHub repository containing this project.
 - A Supabase project in the region closest to the riding school.
-- A Render account with a payment method and the **Starter** service plan selected. The free plan sleeps on inactivity and is unsuitable for staff use.
+- A Render account. This Blueprint uses the **Free** service plan for a no-cost pilot. It sleeps after inactivity and is unsuitable for time-sensitive staff use.
 - A Namecheap-managed domain, if a custom domain is required.
 
 ## 1. Create the Supabase database
@@ -23,7 +23,7 @@ This guide deploys Absolute Equestrian Scheduler as one Node.js service on Rende
 
 1. In Render, choose **New → Blueprint** and connect this GitHub repository.
 2. Render reads `render.yaml` and proposes the `absolute-equestrian-scheduler` web service.
-3. Select the Starter plan and create the service.
+3. Confirm the Free plan and create the service. Do not enter payment information unless you intentionally upgrade to a paid, always-on plan.
 4. In the service’s environment variables, enter:
 
    | Key | Value |
