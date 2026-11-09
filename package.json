@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "concurrently \"pnpm --filter @absolute/api dev\" \"pnpm --filter @absolute/web dev\"",
     "build": "pnpm -r build",
+    "start": "node apps/api/dist/server.js",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm --filter @absolute/shared build && pnpm --filter @absolute/api typecheck && pnpm --filter @absolute/web typecheck",
     "test": "pnpm -r test"
@@ -14,6 +17,9 @@
     "eslint": "^9.18.0",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2",
-    "typescript-eslint": "^8.24.0"
+    "typescript-eslint": "^8.24.0",
+    "prisma": "^6.2.1",
+    "@prisma/client": "^6.2.1",
+    "tsx": "^4.19.2"
   }
 }
