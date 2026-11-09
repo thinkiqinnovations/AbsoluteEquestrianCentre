@@ -32,7 +32,7 @@ This guide deploys Absolute Equestrian Scheduler as one Node.js service on Rende
    | `DIRECT_URL` | Supabase direct connection string |
    | `NODE_ENV` | `production` |
 
-5. Deploy. Render runs the build, applies the Prisma migration with `pnpm prisma:migrate:deploy`, starts the application, and checks `/health`.
+5. Deploy. The Render build runs `pnpm prisma:migrate:deploy` before compiling and starting the application, then checks `/health`. This placement is required because Render Free services do not support pre-deploy commands.
 
 The initial database starts empty. Add horses, riders, and coaches through the application before scheduling lessons.
 

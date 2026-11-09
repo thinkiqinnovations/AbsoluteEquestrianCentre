@@ -63,7 +63,7 @@ See [deployguide.md](deployguide.md) for the full Supabase, Render, verification
 1. In Supabase, create a project and obtain:
    - the Session Pooler connection string for `DATABASE_URL`;
    - the direct connection string for `DIRECT_URL`.
-2. In Render, create a Blueprint from this GitHub repository. `render.yaml` supplies the build, migration, start, health-check, and Node environment configuration.
+2. In Render, create a Blueprint from this GitHub repository. `render.yaml` supplies the build (including the Prisma migration), start, health-check, and Node environment configuration.
 3. Enter `DATABASE_URL` and `DIRECT_URL` as secret Render environment variables. Do not commit them.
 4. The Blueprint uses Render's `free` plan for a no-cost pilot. It sleeps after inactivity; use a paid always-on plan before staff depend on the service day to day.
 5. Point the Namecheap domain to the Render service according to Render’s custom-domain instructions. Express serves both the application and its API under that domain, so `CORS_ORIGIN` is optional. Set it only if a separate frontend origin is introduced.
