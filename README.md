@@ -99,6 +99,8 @@ Prisma migrations are stored in `prisma/migrations/`. Apply the availability mig
 
 ## Scheduling and availability
 
+- To book a shared session, add one lesson per rider and horse with the same coach, date, start and end times, discipline, and lesson type. Choose **Semi-private** for up to two riders or **Group** for a larger session. Each rider and horse still has its own booking, availability checks, and workload rules. Other overlapping sessions with the same coach are rejected.
+
 - `APP_TIME_ZONE` defaults to `America/Toronto`. The scheduler exchanges barn-local dates (`YYYY-MM-DD`) and wall-clock times (`HH:mm`). The API supplies the configured time zone to the web app. Date navigation and weekly rules use civil calendar arithmetic.
 - Switch between **Day** and **Week** on the Schedule page. The Material UI weekly grid defaults to 8 AM–9 PM and expands for lessons outside those hours. Select a lesson to edit it or select a time slot to open Add Lesson with that date and time filled in.
 - Open **Availability** for a rider, coach, or horse to manage multiple weekly windows and dated overrides. Overrides take precedence over recurring rules. When available and unavailable windows of the same precedence overlap, unavailable wins. The editor rejects redundant overlapping windows of the same type.

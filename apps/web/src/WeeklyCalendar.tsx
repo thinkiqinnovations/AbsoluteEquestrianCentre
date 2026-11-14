@@ -79,7 +79,10 @@ export function WeeklyCalendar({ start, onAdd, onEdit }: {
                   <Typography component="span" display="block" variant="caption">{formatTime(lesson.startTime)} – {formatTime(lesson.endTime)}</Typography>
                   <Typography component="span" display="block" variant="body2">{name(lesson.rider)} · {lesson.horse.name}</Typography>
                   <Typography component="span" display="block" variant="caption">
-                    {lesson.coach.firstName} · {lesson.discipline === 'FLAT' ? 'Flat' : 'Jump'}{lesson.status === 'CANCELLED' ? ' · Cancelled' : ''}
+                    {lesson.coach.firstName} · {lesson.discipline === 'FLAT' ? 'Flat' : 'Jump'}
+                    {lesson.lessonType === 'SEMI_PRIVATE' && ' · Semi-private'}
+                    {lesson.lessonType === 'GROUP' && ' · Group'}
+                    {lesson.status === 'CANCELLED' && ' · Cancelled'}
                   </Typography>
                 </Button>)}
               {hour < 23 && <Button size="small" sx={{ mt: 'auto' }}

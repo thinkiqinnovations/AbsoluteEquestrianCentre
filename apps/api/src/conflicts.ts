@@ -12,12 +12,22 @@ export function findConflicts(candidate: LessonInput, context: Context, ignoredL
   const conflicts: Conflict[] = [];
   if (!horse || !rider || !coach) return [{ code: 'REFERENCE_NOT_FOUND', severity: 'ERROR', message: 'Rider, horse, or coach was not found.' }];
   const sameDay = context.lessons.filter((lesson) => lesson.id !== ignoredLessonId && lesson.date === candidate.date && active(lesson));
-  const doubleBooked = (field: 'horseId' | 'riderId' | 'coachId', code: string, subject: string) => {
+  const doubleBooked = (field: 'horseId' | 'riderId', code: string, subject: string) => {
     if (sameDay.some((lesson) => lesson[field] === candidate[field] && overlaps(candidate, lesson))) conflicts.push({ code, severity: 'ERROR', message: `${subject} is already assigned during this time.` });
   };
   doubleBooked('horseId', 'HORSE_DOUBLE_BOOKED', horse.name);
   doubleBooked('riderId', 'RIDER_DOUBLE_BOOKED', `${rider.firstName} ${rider.lastName}`);
-  doubleBooked('coachId', 'COACH_DOUBLE_BOOKED', `${coach.firstName} ${coach.lastName}`);
+  const coachName = `${coach.firstName} ${coach.lastName}`;
+  const coachBookings = sameDay.filter((lesson) => lesson.coachId === coach.id && overlaps(candidate, lesson));
+  const shared = candidate.lessonType === 'SEMI_PRIVATE' || candidate.lessonType === 'GROUP';
+  const differentSession = coachBookings.some((lesson) => !shared
+    || lesson.lessonType !== candidate.lessonType || lesson.discipline !== candidate.discipline
+    || lesson.startTime !== candidate.startTime || lesson.endTime !== candidate.endTime);
+  if (differentSession) {
+    conflicts.push({ code: 'COACH_DOUBLE_BOOKED', severity: 'ERROR', message: `${coachName} is already assigned to another session during this time.` });
+  } else if (candidate.lessonType === 'SEMI_PRIVATE' && coachBookings.length >= 2) {
+    conflicts.push({ code: 'SEMI_PRIVATE_FULL', severity: 'ERROR', message: 'This semi-private session already has two riders.' });
+  }
   const level = candidate.discipline === 'JUMP' ? rider.jumpLevel : rider.flatLevel;
   if (RIDER_LEVEL_RANK[level] < RIDER_LEVEL_RANK[horse.minimumRiderLevel] || RIDER_LEVEL_RANK[level] > RIDER_LEVEL_RANK[horse.maximumRiderLevel]) conflicts.push({ code: 'RIDER_LEVEL_INCOMPATIBLE', severity: 'ERROR', message: `${rider.firstName}'s ${candidate.discipline.toLowerCase()} level is outside ${horse.name}'s supported rider level range.` });
   if (candidate.discipline === 'JUMP' && !horse.supportsJumping) conflicts.push({ code: 'HORSE_NOT_JUMP_CAPABLE', severity: 'ERROR', message: `${horse.name} does not support jumping.` });

@@ -3,7 +3,7 @@ import { intervalSchema, ordered } from './scheduling.js';
 export * from './scheduling.js';
 
 export const riderLevels = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const;
-export const lessonTypes = ['PRIVATE', 'GROUP', 'PART_BOARD_RIDE'] as const;
+export const lessonTypes = ['PRIVATE', 'SEMI_PRIVATE', 'GROUP', 'PART_BOARD_RIDE'] as const;
 export const disciplines = ['FLAT', 'JUMP'] as const;
 export const lessonStatuses = ['DRAFT', 'CONFIRMED', 'COMPLETED', 'CANCELLED'] as const;
 

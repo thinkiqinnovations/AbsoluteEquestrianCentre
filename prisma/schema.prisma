@@ -18,6 +18,7 @@ enum LessonType {
   PRIVATE
   GROUP
   PART_BOARD_RIDE
+  SEMI_PRIVATE
 }
 
 enum Discipline {
