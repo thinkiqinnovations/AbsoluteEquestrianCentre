@@ -102,6 +102,8 @@ app.get('/api/schedule', async (req, res, next) => {
     next(error);
   }
 });
+app.use('/api', (_req, res) => { notFound(res); });
+
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   void _next;
   console.error(error);

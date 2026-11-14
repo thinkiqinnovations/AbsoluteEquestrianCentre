@@ -1,4 +1,4 @@
-import { barnToday, type AvailabilityRecords, type Resource } from '@absolute/shared';
+import { barnToday, monday, type AvailabilityRecords, type Resource } from '@absolute/shared';
 import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { evaluateAvailability } from './availability.js';
@@ -16,6 +16,17 @@ const recurring: AvailabilityRecords = {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.resetModules();
+});
+
+it('serves sample lessons across the current barn week and returns JSON for unknown API routes', async () => {
+  vi.stubEnv('DATABASE_URL', undefined);
+  vi.stubEnv('BILLING_ENABLED', 'false');
+  const { app } = await import('./app.js');
+  const { appTimeZone } = await import('./time-zone.js');
+  const api = request(app);
+  const week = await api.get('/api/schedule/week').query({ start: monday(barnToday(appTimeZone)) }).expect(200);
+  expect(new Set(week.body.lessons.map((lesson: { date: string }) => lesson.date)).size).toBe(7);
+  await api.get('/api/unknown').expect('Content-Type', /json/).expect(404, { error: { code: 'NOT_FOUND' } });
 });
 
 describe('effective availability', () => {
