@@ -89,4 +89,5 @@ class PostgresDatabase implements SchedulerDatabase {
   async disconnect() { await this.prisma.$disconnect(); }
 }
 
-export const database: SchedulerDatabase = process.env.DATABASE_URL ? new PostgresDatabase(new PrismaClient()) : new MemoryDatabase();
+export const prisma = process.env.DATABASE_URL ? new PrismaClient() : undefined;
+export const database: SchedulerDatabase = prisma ? new PostgresDatabase(prisma) : new MemoryDatabase();

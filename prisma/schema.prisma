@@ -113,3 +113,55 @@ model Lesson {
   @@index([date, riderId])
   @@index([date, coachId])
 }
+
+enum AvailabilityResourceType {
+  RIDER
+  COACH
+  HORSE
+}
+
+enum AvailabilityType {
+  AVAILABLE
+  UNAVAILABLE
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+model AvailabilityRule {
+  id String @id @default(cuid())
+  resourceType AvailabilityResourceType
+  resourceId String
+  dayOfWeek DayOfWeek
+  startTime String
+  endTime String
+  availabilityType AvailabilityType
+  notes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([resourceType, resourceId, dayOfWeek])
+}
+
+model AvailabilityOverride {
+  id String @id @default(cuid())
+  resourceType AvailabilityResourceType
+  resourceId String
+  date DateTime @db.Date
+  startTime String
+  endTime String
+  availabilityType AvailabilityType
+  notes String?
+  reason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([resourceType, resourceId, date])
+}

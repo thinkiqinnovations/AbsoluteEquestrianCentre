@@ -1,8 +1,8 @@
 import { RIDER_LEVEL_RANK, WORKLOAD_THRESHOLDS, type LessonInput } from '@absolute/shared';
 import type { Coach, Conflict, Horse, Lesson, Rider } from './types.js';
+import { overlaps } from './intervals.js';
 
 type Context = { horses: Horse[]; riders: Rider[]; coaches: Coach[]; lessons: Lesson[] };
-const overlaps = (a: LessonInput, b: LessonInput) => a.startTime < b.endTime && b.startTime < a.endTime;
 const active = (lesson: Lesson) => lesson.status !== 'CANCELLED';
 
 export function findConflicts(candidate: LessonInput, context: Context, ignoredLessonId?: string): Conflict[] {

@@ -1,8 +1,10 @@
 import type { Coach, Horse, Lesson, Rider } from './types.js';
+import { barnToday } from '@absolute/shared';
+import { appTimeZone } from './time-zone.js';
 
 const now = () => new Date().toISOString();
 const make = <T extends object>(id: string, input: T) => ({ ...input, id, createdAt: now(), updatedAt: now() });
-const today = new Date().toISOString().slice(0, 10);
+const today = barnToday(appTimeZone);
 
 export const store: { horses: Horse[]; riders: Rider[]; coaches: Coach[]; lessons: Lesson[] } = {
   horses: [

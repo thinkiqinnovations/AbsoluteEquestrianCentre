@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { findConflicts } from './conflicts.js';
 import { store } from './store.js';
+import { barnToday } from '@absolute/shared';
+import { appTimeZone } from './time-zone.js';
 
-const base = { date: new Date().toISOString().slice(0, 10), startTime: '09:30', endTime: '10:30', riderId: 'rider-noah', horseId: 'horse-jasper', coachId: 'coach-james', lessonType: 'PRIVATE' as const, discipline: 'FLAT' as const, rideUnits: 1, status: 'CONFIRMED' as const, notes: '' };
+const base = { date: barnToday(appTimeZone), startTime: '09:30', endTime: '10:30', riderId: 'rider-noah', horseId: 'horse-jasper', coachId: 'coach-james', lessonType: 'PRIVATE' as const, discipline: 'FLAT' as const, rideUnits: 1, status: 'CONFIRMED' as const, notes: '' };
 describe('schedule conflict detection', () => {
   it('detects double booking and workload violations', () => {
     const conflicts = findConflicts(base, store);

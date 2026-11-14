@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { intervalSchema, ordered } from './scheduling.js';
+export * from './scheduling.js';
 
 export const riderLevels = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const;
 export const lessonTypes = ['PRIVATE', 'GROUP', 'PART_BOARD_RIDE'] as const;
@@ -57,8 +59,7 @@ export const coachSchema = z.object({
 
 export const lessonSchema = z.object({
   date: z.string().date(),
-  startTime: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/, 'Use HH:mm time.'),
-  endTime: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/, 'Use HH:mm time.'),
+  ...intervalSchema.shape,
   riderId: z.string().min(1),
   horseId: z.string().min(1),
   coachId: z.string().min(1),
@@ -67,7 +68,7 @@ export const lessonSchema = z.object({
   rideUnits: z.coerce.number().positive().max(10),
   status: z.enum(lessonStatuses),
   notes: optionalText,
-}).refine((value) => value.startTime < value.endTime, { message: 'End time must be after start time.', path: ['endTime'] });
+}).refine(ordered, { message: 'End time must be after start time.', path: ['endTime'] });
 
 export type HorseInput = z.infer<typeof horseSchema>;
 export type RiderInput = z.infer<typeof riderSchema>;
