@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { availabilityTypes, barnToday, overrideReasons, weekdays, type AvailabilityRecords, type AvailabilityRule, type AvailabilityOverride, type Resource } from '@absolute/shared';
 import { useState } from 'react';
 import { api } from './api';
+import { errorMessage } from './save-errors';
 import { formatTime, useBarnTimeZone } from './scheduling';
 
 type Window = AvailabilityRule | AvailabilityOverride;
@@ -42,7 +43,7 @@ export function AvailabilityEditor({ resource, name, close }: { resource: Resour
       void client.invalidateQueries({ queryKey: ['availability'] });
       void client.invalidateQueries({ queryKey: ['schedule'] });
     },
-    onError: (response: { error?: { message?: string } }) => setError(response.error?.message ?? 'Check the date and times and try again.'),
+    onError: (response: unknown) => setError(errorMessage(response)),
   });
   const row = (item: Window) => <Stack key={item.id} direction="row" alignItems="center" gap={1} flexWrap="wrap">
     <Typography variant="body2" sx={{ flexGrow: 1 }}>
@@ -60,7 +61,7 @@ export function AvailabilityEditor({ resource, name, close }: { resource: Resour
         <Typography variant="body2" color="text.secondary">Times use {zone}. Date overrides take precedence over weekly rules.</Typography>
         {query.isPending && <Typography>Loading availability…</Typography>}
         {query.isError && <Alert severity="error">Unable to load availability.</Alert>}
-        {error && <Alert severity="error">{error}</Alert>}
+        {error && <Alert severity="error" sx={{ whiteSpace: 'pre-line' }}>{error}</Alert>}
         {draft && <Box component="form" onSubmit={(event) => { event.preventDefault(); mutation.mutate({ window: draft }); }} sx={{ p: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
           <Stack gap={1.5}>
             <Typography variant="h6">{draft.date !== undefined ? 'Date override' : 'Weekly window'}</Typography>

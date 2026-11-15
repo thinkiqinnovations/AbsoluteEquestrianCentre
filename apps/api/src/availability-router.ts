@@ -5,6 +5,7 @@ import { database } from './database.js';
 import { availabilityRecords, overrides, rules } from './availability-store.js';
 import { effectiveAvailability, evaluateAvailability } from './availability.js';
 import { overlaps } from './intervals.js';
+import { validationError } from './validation-error.js';
 
 export const availabilityRouter: Router = Router();
 const missing = (res: Response) => res.status(404).json({ error: { code: 'NOT_FOUND' } });
@@ -15,7 +16,7 @@ function route(handler: (req: Request, res: Response) => Promise<unknown>) {
   return (req: Request, res: Response, next: NextFunction) => {
     void handler(req, res).catch((error: unknown) => {
       if (error instanceof z.ZodError) {
-        res.status(400).json({ error: { code: 'VALIDATION_ERROR', details: error.flatten() } });
+        res.status(400).json({ error: validationError(error) });
       } else if (typeof error === 'object' && error && 'code' in error && error.code === 'P2025') {
         missing(res);
       } else {

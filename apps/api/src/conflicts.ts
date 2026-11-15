@@ -10,15 +10,15 @@ export function findConflicts(candidate: LessonInput, context: Context, ignoredL
   const rider = context.riders.find((item) => item.id === candidate.riderId);
   const coach = context.coaches.find((item) => item.id === candidate.coachId);
   const conflicts: Conflict[] = [];
-  if (!horse || !rider || !coach) return [{ code: 'REFERENCE_NOT_FOUND', severity: 'ERROR', message: 'Rider, horse, or coach was not found.' }];
+  if (!horse || !rider || (!coach && (candidate.coachId || candidate.lessonType !== 'PART_BOARD_RIDE'))) return [{ code: 'REFERENCE_NOT_FOUND', severity: 'ERROR', message: 'Rider, horse, or coach was not found.' }];
   const sameDay = context.lessons.filter((lesson) => lesson.id !== ignoredLessonId && lesson.date === candidate.date && active(lesson));
   const doubleBooked = (field: 'horseId' | 'riderId', code: string, subject: string) => {
     if (sameDay.some((lesson) => lesson[field] === candidate[field] && overlaps(candidate, lesson))) conflicts.push({ code, severity: 'ERROR', message: `${subject} is already assigned during this time.` });
   };
   doubleBooked('horseId', 'HORSE_DOUBLE_BOOKED', horse.name);
   doubleBooked('riderId', 'RIDER_DOUBLE_BOOKED', `${rider.firstName} ${rider.lastName}`);
-  const coachName = `${coach.firstName} ${coach.lastName}`;
-  const coachBookings = sameDay.filter((lesson) => lesson.coachId === coach.id && overlaps(candidate, lesson));
+  const coachName = coach ? `${coach.firstName} ${coach.lastName}` : '';
+  const coachBookings = coach ? sameDay.filter((lesson) => lesson.coachId === coach.id && overlaps(candidate, lesson)) : [];
   const shared = candidate.lessonType === 'SEMI_PRIVATE' || candidate.lessonType === 'GROUP';
   const differentSession = coachBookings.some((lesson) => !shared
     || lesson.lessonType !== candidate.lessonType || lesson.discipline !== candidate.discipline

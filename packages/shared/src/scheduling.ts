@@ -16,6 +16,10 @@ const fields = intervalSchema.extend({
   notes: z.string().trim().max(2000).nullish(),
 });
 export const ruleFields = fields.extend({ dayOfWeek: z.enum(weekdays) });
+export const coachWeeklyAvailabilitySchema = z.array(
+  intervalSchema.extend({ dayOfWeek: z.enum(weekdays) }).refine(ordered, 'End time must be after start time.'),
+).max(7).refine((entries) => new Set(entries.map(({ dayOfWeek }) => dayOfWeek)).size === entries.length, 'Select each weekday once.');
+export type CoachWeeklyAvailability = z.infer<typeof coachWeeklyAvailabilitySchema>;
 export const overrideFields = fields.extend({ date: dateSchema, reason: z.enum(overrideReasons).nullish() });
 export const ruleSchema = ruleFields.merge(resourceSchema).refine(ordered, 'End time must be after start time.');
 export const overrideSchema = overrideFields.merge(resourceSchema).refine(ordered, 'End time must be after start time.');
@@ -51,3 +55,18 @@ export function barnToday(timeZone = defaultTimeZone, now = new Date()) {
 }
 export const weekStartSchema = dateSchema.refine((date) => weekday(date) === 'MONDAY', 'Week start must be a Monday.');
 export const operatingHours = { start: 8, end: 21 };
+
+export function monthRange(year: number, month: number) {
+  const start = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-01`;
+  const next = civilDate(start);
+  next.setUTCMonth(next.getUTCMonth() + 1);
+  next.setUTCDate(0);
+  return { year, month, start, end: dateValue(next), dates: Array.from({ length: next.getUTCDate() }, (_, index) => addDays(start, index)) };
+}
+
+export function shiftMonth(date: string, amount: number) {
+  const first = civilDate(date.slice(0, 7) + '-01');
+  first.setUTCMonth(first.getUTCMonth() + amount);
+  const range = monthRange(first.getUTCFullYear(), first.getUTCMonth() + 1);
+  return range.dates[Math.min(Number(date.slice(8)), range.dates.length) - 1];
+}

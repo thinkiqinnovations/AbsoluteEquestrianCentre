@@ -1,45 +1,30 @@
-import { Alert, Box, Button, Card, Chip, CircularProgress, MenuItem, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, Chip, CircularProgress, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { disciplines, operatingHours, weekDates, type LessonInput } from '@absolute/shared';
-import { useState } from 'react';
+import { operatingHours, weekDates } from '@absolute/shared';
 import { api } from './api';
-import { formatDate, formatTime } from './scheduling';
+import { formatDate, formatTime, scheduleKeys } from './scheduling';
+import { matchesFilters, personName as name, ScheduleFilters, type CalendarLesson, type Filters } from './ScheduleFilters';
 
-type Person = { id: string; firstName: string; lastName: string };
-type WeekLesson = LessonInput & {
-  id: string;
-  rider: Person;
-  coach: Person;
-  horse: { id: string; name: string };
-};
 type Week = {
-  lessons: WeekLesson[];
+  lessons: CalendarLesson[];
   summary: { lessonCount: number; conflictCount: number; horsesNearCapacity: number };
   conflicts: { lessonId: string; severity: 'ERROR' | 'WARNING'; message: string }[];
 };
-const empty = { coachId: '', horseId: '', riderId: '', discipline: '' };
-const name = (person: Person) => `${person.firstName} ${person.lastName}`;
 const clock = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
 
-export function WeeklyCalendar({ start, onAdd, onEdit }: {
+export function WeeklyCalendar({ start, onAdd, onEdit, filters, onFilter }: {
   start: string;
+  filters: Filters;
+  onFilter: (filters: Filters) => void;
   onAdd: (date: string, startTime: string, endTime: string) => void;
-  onEdit: (lesson: WeekLesson) => void;
+  onEdit: (lesson: CalendarLesson) => void;
 }) {
-  const [filters, setFilters] = useState(empty);
-  const query = useQuery({ queryKey: ['schedule', 'week', start], queryFn: () => api<Week>(`/api/schedule/week?start=${start}`) });
+  const query = useQuery({ queryKey: scheduleKeys.week(start), queryFn: () => api<Week>(`/api/schedule/week?start=${start}`) });
   if (query.isPending) return <CircularProgress />;
   if (query.isError) return <Alert severity="error">Unable to load the weekly schedule.</Alert>;
   const { lessons, summary, conflicts } = query.data;
-  const options = [
-    { field: 'coachId', label: 'Coach', values: lessons.map(({ coach }) => [coach.id, name(coach)]) },
-    { field: 'horseId', label: 'Horse', values: lessons.map(({ horse }) => [horse.id, horse.name]) },
-    { field: 'riderId', label: 'Rider', values: lessons.map(({ rider }) => [rider.id, name(rider)]) },
-    { field: 'discipline', label: 'Discipline', values: disciplines.map((value) => [value, value === 'FLAT' ? 'Flat' : 'Jump']) },
-  ] as const;
-  const visible = lessons.filter((lesson) => options.every(({ field, values }) =>
-    !filters[field] || !values.some(([id]) => id === filters[field]) || lesson[field] === filters[field]));
+  const visible = lessons.filter((lesson) => matchesFilters(lesson, filters));
   const dates = weekDates(start);
   const firstHour = Math.min(operatingHours.start, ...visible.map((lesson) => Math.floor(minutes(lesson.startTime) / 60)));
   const lastHour = Math.max(operatingHours.end, ...visible.map((lesson) => Math.ceil(minutes(lesson.endTime) / 60)));
@@ -47,16 +32,7 @@ export function WeeklyCalendar({ start, onAdd, onEdit }: {
   const columns = '84px repeat(7, minmax(132px, 1fr))';
 
   return <Stack gap={2}>
-    <Stack direction="row" gap={1} flexWrap="wrap" alignItems="center">
-      {options.map(({ field, label, values }) => <TextField key={field} select size="small" label={label}
-        value={values.some(([id]) => id === filters[field]) ? filters[field] : ''}
-        onChange={(event) => setFilters({ ...filters, [field]: event.target.value })} sx={{ minWidth: 130 }}
-        slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
-        <MenuItem value="">All</MenuItem>
-        {[...new Map(values.map(([id, text]) => [id, text]))].map(([id, text]) => <MenuItem key={id} value={id}>{text}</MenuItem>)}
-      </TextField>)}
-      <Button onClick={() => setFilters(empty)}>Clear filters</Button>
-    </Stack>
+    <ScheduleFilters lessons={lessons} filters={filters} onChange={onFilter} />
     <Stack direction="row" gap={1} flexWrap="wrap">
       <Chip label={`${summary.lessonCount} lessons`} />
       <Chip label={`${summary.horsesNearCapacity} horses near workload limit`} />
@@ -79,9 +55,10 @@ export function WeeklyCalendar({ start, onAdd, onEdit }: {
                   <Typography component="span" display="block" variant="caption">{formatTime(lesson.startTime)} – {formatTime(lesson.endTime)}</Typography>
                   <Typography component="span" display="block" variant="body2">{name(lesson.rider)} · {lesson.horse.name}</Typography>
                   <Typography component="span" display="block" variant="caption">
-                    {lesson.coach.firstName} · {lesson.discipline === 'FLAT' ? 'Flat' : 'Jump'}
+                    {lesson.coach?.firstName ?? 'Self ride'} · {lesson.discipline === 'FLAT' ? 'Flat' : 'Jump'}
                     {lesson.lessonType === 'SEMI_PRIVATE' && ' · Semi-private'}
                     {lesson.lessonType === 'GROUP' && ' · Group'}
+                    {lesson.lessonType === 'PART_BOARD_RIDE' && ' · Part board'}
                     {lesson.status === 'CANCELLED' && ' · Cancelled'}
                   </Typography>
                 </Button>)}

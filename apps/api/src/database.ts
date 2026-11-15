@@ -1,6 +1,6 @@
-import { PrismaClient, type Coach as PrismaCoach, type Horse as PrismaHorse, type Lesson as PrismaLesson, type Rider as PrismaRider, type RiderHorsePreference } from '@prisma/client';
-import type { CoachInput, HorseInput, LessonInput, RiderInput } from '@absolute/shared';
-import { id, store } from './store.js';
+import { PrismaClient, Prisma, type Coach as PrismaCoach, type Horse as PrismaHorse, type Lesson as PrismaLesson, type Rider as PrismaRider, type RiderHorsePreference } from '@prisma/client';
+import type { CoachInput, CoachWeeklyAvailability, HorseInput, LessonInput, RiderInput, RuleInput } from '@absolute/shared';
+import { id, memoryAvailabilityRules, store } from './store.js';
 import type { Coach, Horse, Lesson, Rider } from './types.js';
 
 export type SchedulerSnapshot = { horses: Horse[]; riders: Rider[]; coaches: Coach[]; lessons: Lesson[] };
@@ -12,11 +12,13 @@ const nullableText = (value: string | undefined) => value || null;
 const toHorse = (horse: PrismaHorse): Horse => ({ ...horse, description: horse.description ?? '', notes: horse.notes ?? '', maximumDailyRideUnits: Number(horse.maximumDailyRideUnits), createdAt: timestamp(horse.createdAt), updatedAt: timestamp(horse.updatedAt) });
 const toRider = (rider: PrismaRider & { preferences: RiderHorsePreference[] }): Rider => ({ ...rider, notes: rider.notes ?? '', preferences: rider.preferences.map((preference) => ({ horseId: preference.horseId, preferenceOrder: preference.preferenceOrder, notes: preference.notes ?? '' })), createdAt: timestamp(rider.createdAt), updatedAt: timestamp(rider.updatedAt) });
 const toCoach = (coach: PrismaCoach): Coach => ({ ...coach, notes: coach.notes ?? '', createdAt: timestamp(coach.createdAt), updatedAt: timestamp(coach.updatedAt) });
-const toLesson = (lesson: PrismaLesson): Lesson => ({ ...lesson, date: dateValue(lesson.date), notes: lesson.notes ?? '', rideUnits: Number(lesson.rideUnits), createdAt: timestamp(lesson.createdAt), updatedAt: timestamp(lesson.updatedAt) });
+export const toLesson = (lesson: PrismaLesson): Lesson => ({ ...lesson, date: dateValue(lesson.date), occurrenceDate: lesson.occurrenceDate ? dateValue(lesson.occurrenceDate) : undefined, notes: lesson.notes ?? '', rideUnits: Number(lesson.rideUnits), createdAt: timestamp(lesson.createdAt), updatedAt: timestamp(lesson.updatedAt) });
+
+type DateRange = { start: string; end: string };
 
 export interface SchedulerDatabase {
   mode: DatabaseMode;
-  snapshot(): Promise<SchedulerSnapshot>;
+  snapshot(range?: DateRange): Promise<SchedulerSnapshot>;
   horses(): Promise<Horse[]>;
   horse(id: string): Promise<Horse | undefined>;
   createHorse(input: HorseInput): Promise<Horse>;
@@ -27,7 +29,7 @@ export interface SchedulerDatabase {
   updateRider(id: string, input: RiderInput): Promise<Rider | undefined>;
   coaches(): Promise<Coach[]>;
   coach(id: string): Promise<Coach | undefined>;
-  createCoach(input: CoachInput): Promise<Coach>;
+  createCoach(input: CoachInput, weeklyAvailability?: CoachWeeklyAvailability): Promise<Coach>;
   updateCoach(id: string, input: CoachInput): Promise<Coach | undefined>;
   lessons(date?: string): Promise<Lesson[]>;
   lesson(id: string): Promise<Lesson | undefined>;
@@ -36,9 +38,15 @@ export interface SchedulerDatabase {
   disconnect(): Promise<void>;
 }
 
+function coachRules(resourceId: string, windows: CoachWeeklyAvailability): RuleInput[] {
+  return windows.map((window) => ({ ...window, resourceId, resourceType: 'COACH', availabilityType: 'AVAILABLE' }));
+}
+
 class MemoryDatabase implements SchedulerDatabase {
   readonly mode = 'seeded-memory' as const;
-  async snapshot(): Promise<SchedulerSnapshot> { return store; }
+  async snapshot(range?: DateRange): Promise<SchedulerSnapshot> {
+    return range ? { ...store, lessons: store.lessons.filter(({ date }) => date >= range.start && date <= range.end) } : store;
+  }
   async horses() { return store.horses; }
   async horse(entityId: string) { return store.horses.find((item) => item.id === entityId); }
   async createHorse(input: HorseInput) { const entity: Horse = { ...input, id: id('horse'), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; store.horses.push(entity); return entity; }
@@ -49,7 +57,16 @@ class MemoryDatabase implements SchedulerDatabase {
   async updateRider(entityId: string, input: RiderInput) { const index = store.riders.findIndex((item) => item.id === entityId); if (index < 0) return undefined; store.riders[index] = { ...store.riders[index], ...input, preferences: input.preferences.map((item, preferenceOrder) => ({ ...item, preferenceOrder: preferenceOrder + 1 })), updatedAt: new Date().toISOString() }; return store.riders[index]; }
   async coaches() { return store.coaches; }
   async coach(entityId: string) { return store.coaches.find((item) => item.id === entityId); }
-  async createCoach(input: CoachInput) { const entity: Coach = { ...input, id: id('coach'), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; store.coaches.push(entity); return entity; }
+  async createCoach(input: CoachInput, weeklyAvailability: CoachWeeklyAvailability = []) {
+    const timestamp = new Date().toISOString();
+    const coach = { ...input, id: id('coach'), createdAt: timestamp, updatedAt: timestamp };
+    const rules = coachRules(coach.id, weeklyAvailability).map((rule) => ({
+      ...rule, id: id('availability'), createdAt: timestamp, updatedAt: timestamp,
+    }));
+    store.coaches.push(coach);
+    memoryAvailabilityRules.push(...rules);
+    return coach;
+  }
   async updateCoach(entityId: string, input: CoachInput) { const index = store.coaches.findIndex((item) => item.id === entityId); if (index < 0) return undefined; store.coaches[index] = { ...store.coaches[index], ...input, updatedAt: new Date().toISOString() }; return store.coaches[index]; }
   async lessons(date?: string) { return date ? store.lessons.filter((item) => item.date === date) : store.lessons; }
   async lesson(entityId: string) { return store.lessons.find((item) => item.id === entityId); }
@@ -58,35 +75,44 @@ class MemoryDatabase implements SchedulerDatabase {
   async disconnect() { /* No connection in development fallback. */ }
 }
 
-class PostgresDatabase implements SchedulerDatabase {
+export class PostgresDatabase implements SchedulerDatabase {
   readonly mode = 'postgres' as const;
-  constructor(private readonly prisma: PrismaClient) {}
-  async snapshot(): Promise<SchedulerSnapshot> {
-    const [horses, riders, coaches, lessons] = await this.prisma.$transaction([
+  constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient) {}
+  async snapshot(range?: DateRange): Promise<SchedulerSnapshot> {
+    const [horses, riders, coaches, lessons] = await Promise.all([
       this.prisma.horse.findMany({ orderBy: { name: 'asc' } }),
       this.prisma.rider.findMany({ include: { preferences: { orderBy: { preferenceOrder: 'asc' } } }, orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }] }),
       this.prisma.coach.findMany({ orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }] }),
-      this.prisma.lesson.findMany(),
+      this.prisma.lesson.findMany({ where: range ? { date: { gte: new Date(range.start), lte: new Date(range.end) } } : undefined }),
     ]);
     return { horses: horses.map(toHorse), riders: riders.map(toRider), coaches: coaches.map(toCoach), lessons: lessons.map(toLesson) };
   }
   async horses() { return (await this.prisma.horse.findMany({ orderBy: { name: 'asc' } })).map(toHorse); }
   async horse(entityId: string) { const entity = await this.prisma.horse.findUnique({ where: { id: entityId } }); return entity ? toHorse(entity) : undefined; }
   async createHorse(input: HorseInput) { return toHorse(await this.prisma.horse.create({ data: { ...input, description: nullableText(input.description), notes: nullableText(input.notes) } })); }
-  async updateHorse(entityId: string, input: HorseInput) { try { return toHorse(await this.prisma.horse.update({ where: { id: entityId }, data: { ...input, description: nullableText(input.description), notes: nullableText(input.notes) } })); } catch { return undefined; } }
+  async updateHorse(entityId: string, input: HorseInput) { try { return toHorse(await this.prisma.horse.update({ where: { id: entityId }, data: { ...input, description: nullableText(input.description), notes: nullableText(input.notes) } })); } catch (error) { if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') return undefined; throw error; } }
   async riders() { return (await this.prisma.rider.findMany({ include: { preferences: { orderBy: { preferenceOrder: 'asc' } } }, orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }] })).map(toRider); }
   async rider(entityId: string) { const entity = await this.prisma.rider.findUnique({ where: { id: entityId }, include: { preferences: { orderBy: { preferenceOrder: 'asc' } } } }); return entity ? toRider(entity) : undefined; }
   async createRider(input: RiderInput) { return toRider(await this.prisma.rider.create({ data: { firstName: input.firstName, lastName: input.lastName, active: input.active, overallLevel: input.overallLevel, flatLevel: input.flatLevel, jumpLevel: input.jumpLevel, notes: nullableText(input.notes), preferences: { create: input.preferences.map((preference, index) => ({ horseId: preference.horseId, preferenceOrder: index + 1, notes: nullableText(preference.notes) })) } }, include: { preferences: { orderBy: { preferenceOrder: 'asc' } } } })); }
-  async updateRider(entityId: string, input: RiderInput) { try { return toRider(await this.prisma.rider.update({ where: { id: entityId }, data: { firstName: input.firstName, lastName: input.lastName, active: input.active, overallLevel: input.overallLevel, flatLevel: input.flatLevel, jumpLevel: input.jumpLevel, notes: nullableText(input.notes), preferences: { deleteMany: {}, create: input.preferences.map((preference, index) => ({ horseId: preference.horseId, preferenceOrder: index + 1, notes: nullableText(preference.notes) })) } }, include: { preferences: { orderBy: { preferenceOrder: 'asc' } } } })); } catch { return undefined; } }
+  async updateRider(entityId: string, input: RiderInput) { try { return toRider(await this.prisma.rider.update({ where: { id: entityId }, data: { firstName: input.firstName, lastName: input.lastName, active: input.active, overallLevel: input.overallLevel, flatLevel: input.flatLevel, jumpLevel: input.jumpLevel, notes: nullableText(input.notes), preferences: { deleteMany: {}, create: input.preferences.map((preference, index) => ({ horseId: preference.horseId, preferenceOrder: index + 1, notes: nullableText(preference.notes) })) } }, include: { preferences: { orderBy: { preferenceOrder: 'asc' } } } })); } catch (error) { if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') return undefined; throw error; } }
   async coaches() { return (await this.prisma.coach.findMany({ orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }] })).map(toCoach); }
   async coach(entityId: string) { const entity = await this.prisma.coach.findUnique({ where: { id: entityId } }); return entity ? toCoach(entity) : undefined; }
-  async createCoach(input: CoachInput) { return toCoach(await this.prisma.coach.create({ data: { ...input, notes: nullableText(input.notes) } })); }
-  async updateCoach(entityId: string, input: CoachInput) { try { return toCoach(await this.prisma.coach.update({ where: { id: entityId }, data: { ...input, notes: nullableText(input.notes) } })); } catch { return undefined; } }
+  async createCoach(input: CoachInput, weeklyAvailability: CoachWeeklyAvailability = []) {
+    const data = { ...input, notes: nullableText(input.notes) };
+    if (!weeklyAvailability.length) return toCoach(await this.prisma.coach.create({ data }));
+    if (!('$transaction' in this.prisma)) throw new Error('Coach creation requires a database client.');
+    return this.prisma.$transaction(async (transaction) => {
+      const coach = await transaction.coach.create({ data });
+      await transaction.availabilityRule.createMany({ data: coachRules(coach.id, weeklyAvailability) });
+      return toCoach(coach);
+    });
+  }
+  async updateCoach(entityId: string, input: CoachInput) { try { return toCoach(await this.prisma.coach.update({ where: { id: entityId }, data: { ...input, notes: nullableText(input.notes) } })); } catch (error) { if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') return undefined; throw error; } }
   async lessons(date?: string) { return (await this.prisma.lesson.findMany({ where: date ? { date: new Date(`${date}T00:00:00.000Z`) } : undefined, orderBy: [{ date: 'asc' }, { startTime: 'asc' }] })).map(toLesson); }
   async lesson(entityId: string) { const entity = await this.prisma.lesson.findUnique({ where: { id: entityId } }); return entity ? toLesson(entity) : undefined; }
   async createLesson(input: LessonInput) { return toLesson(await this.prisma.lesson.create({ data: { ...input, date: new Date(`${input.date}T00:00:00.000Z`), notes: nullableText(input.notes) } })); }
-  async updateLesson(entityId: string, input: LessonInput) { try { return toLesson(await this.prisma.lesson.update({ where: { id: entityId }, data: { ...input, date: new Date(`${input.date}T00:00:00.000Z`), notes: nullableText(input.notes) } })); } catch { return undefined; } }
-  async disconnect() { await this.prisma.$disconnect(); }
+  async updateLesson(entityId: string, input: LessonInput) { try { return toLesson(await this.prisma.lesson.update({ where: { id: entityId }, data: { ...input, date: new Date(`${input.date}T00:00:00.000Z`), notes: nullableText(input.notes) } })); } catch (error) { if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') return undefined; throw error; } }
+  async disconnect() { if ('$disconnect' in this.prisma) await this.prisma.$disconnect(); }
 }
 
 export const prisma = process.env.DATABASE_URL ? new PrismaClient() : undefined;

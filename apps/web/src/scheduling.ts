@@ -1,6 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
-import { civilDate, defaultTimeZone } from '@absolute/shared';
+import { civilDate, defaultTimeZone, monday } from '@absolute/shared';
 import { api } from './api';
+
+export const scheduleKeys = {
+  day: (date: string) => ['schedule', 'day', date] as const,
+  week: (start: string) => ['schedule', 'week', start] as const,
+  month: (year: string, month: string) => ['schedule', 'month', year, month] as const,
+};
+
+export function scheduleKeysForDate(date: string) {
+  return [scheduleKeys.day(date), scheduleKeys.week(monday(date)), scheduleKeys.month(date.slice(0, 4), date.slice(5, 7))];
+}
 
 export function useBarnTimeZone() {
   const settings = useQuery({

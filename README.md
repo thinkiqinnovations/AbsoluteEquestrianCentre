@@ -4,9 +4,9 @@ Absolute Equestrian Scheduler is a TypeScript monorepo for managing school horse
 
 ## Development Status
 
-**Iteration 2 adds the weekly calendar and availability management.** The daily schedule, horse/rider/coach management, ranked horse preferences, part-board placeholder, and Render/Supabase deployment path remain available.
+**Iteration 3 adds part boarding and weekly recurring lessons.** Day, Week, and Month scheduling, horse/rider/coach management, ranked horse preferences, availability, shared-coach lessons, and the Render/Supabase deployment path are supported.
 
-Implemented through Iteration 2:
+Implemented through Iteration 3:
 
 - React, Vite, Material UI, React Router, and TanStack Query frontend
 - Express and TypeScript API with Zod request validation
@@ -20,8 +20,10 @@ Implemented through Iteration 2:
 - Conflict-rule unit tests
 - Weekly calendar with coach, horse, rider, and discipline filters, and lesson creation from calendar time slots
 - Lesson editing, recurring availability, date overrides, and server-side availability validation
+- Part-board agreements, ranked ride preferences, weekly and monthly entitlements, and linked horse and rider profiles
+- Weekly lesson and self-ride templates with persisted occurrences, generation reports, and duplicate prevention
 
-Authentication, recurring lessons, automatic scheduling, and billing functionality are deferred.
+Authentication, automatic schedule generation, horse recommendations, and billing functionality are deferred.
 
 - [x] Billing feature capability flag
 - [x] Provider-independent billing interface
@@ -95,7 +97,7 @@ pnpm prisma:migrate:deploy
 pnpm dev
 ```
 
-Prisma migrations are stored in `prisma/migrations/`. Apply the availability migration before running Iteration 2 against an existing PostgreSQL database. Existing lessons require no data conversion.
+Prisma migrations are stored in `prisma/migrations/`. Apply pending migrations before starting the updated API against an existing PostgreSQL database. Existing lessons require no manual data conversion.
 
 ## Scheduling and availability
 
@@ -109,13 +111,72 @@ Prisma migrations are stored in `prisma/migrations/`. Apply the availability mig
 - `GET /api/schedule/week?start=YYYY-MM-DD` and `GET /api/availability/:resourceType/:resourceId/week?start=YYYY-MM-DD` require a valid Monday and return HTTP 400 otherwise. The weekly schedule includes rider, horse, and coach projections. The lesson form requests a single availability preview for the proposed interval, and the API validates again on create or update. The existing lesson PUT endpoint still accepts a full replacement. PATCH accepts partial lesson edits.
 - Weekly rules and overrides use separate indexed tables keyed by resource type and ID. The API validates resource references because a single PostgreSQL foreign key cannot target all three resource tables. Seeded local mode includes example rules and overrides. PostgreSQL starts with no availability configured for existing resources.
 
+## Schedule Views
+
+Day, Week, and Month are projections over the same lessons. Availability, workload, compatibility, double booking, and validation rules remain in the API. The selected date and view can be bookmarked, for example `/schedule?view=month&date=2026-11-14`.
+
+- **Day** shows detailed lessons, horse workload, and scheduling notices. It uses `GET /api/schedule?date=YYYY-MM-DD`.
+- **Week** shows seven days of lesson blocks for short-term resource planning. It uses `GET /api/schedule/week?start=YYYY-MM-DD`.
+- **Month** shows lesson counts, compact previews, and labelled conflict, availability, and workload indicators. It loads the month from `GET /api/schedule/month?year=YYYY&month=MM`. Select a date or **+N more** to open Day view, or select a lesson to edit it in place. On phones the month appears as a scrollable agenda. Adjacent dates in the desktop grid are muted and link to Day view.
+
+Day, Week, and Month share coach, horse, rider, discipline, and lesson-type filters. Month workload indicators reflect the full daily workload of horses represented by the filtered lessons. Coach-less part-board rides are labelled in all three views.
+
+## Part Boarding
+
+A `PartBoardAgreement` links a rider and horse through foreign keys. It records inclusive start and end dates, status, configurable entitlement terms, priority, and notes. The Part Board page shows active agreements by default and can filter by status, rider, and horse. Staff can create, edit, pause, or end agreements while retaining their history. A `PartBoardPreferredRideTime` is a ranked weekly preference. Only scheduled lessons and explicit availability rules affect bookings.
+
+### Horse Profiles
+
+**Part Boarders** lists the horse's linked riders, agreement statuses and dates, entitlements, and preferred times, with links to the agreements.
+
+### Rider Profiles
+
+**Part Board Horses** lists the rider's linked horses, current entitlement balances, and preferred times, with links to the agreements.
+
+## Free-Ride Entitlements
+
+Agreements define a free-ride allowance per Monday–Sunday week or calendar month in the barn timezone. Remaining rides equal the allowance minus usage within that period, with a minimum displayed balance of zero. Free rides are operational entitlements independent of billing. Seeded allowances are demo values. The school can set its actual allowance per agreement.
+
+Part-board rides use the existing Lesson model and allow a coach-less self ride. Booking requires an effective agreement and passes normal rider and horse availability, compatibility, double-booking, and workload checks. By default a ride consumes one entitlement. Staff may explicitly schedule a ride without using an entitlement. An exhausted allowance blocks attempted consumption. Saving a booking and its usage is atomic in PostgreSQL. Cancelling a ride before completion reverses usage while retaining its record. Completed rides keep their entitlement details.
+
+## Recurring Lessons
+
+A `RecurringLessonTemplate` stores a weekly rule and can reference a part-board agreement. Use **Generate lessons** in Part Board to create persisted occurrences through the standard lesson validator. The generation report lists successful, skipped, and failed dates. An occurrence's original template/date pair stays unique even if staff later move the lesson. Pausing, ending, or editing a template only affects future generation. The seeded preview includes regular and part-board templates, an exhausted weekly balance, and a horse-rest override that blocks the first demo self-ride occurrence.
+
+## Scheduling Priority
+
+Part-board recurring rides default to 100 and other recurring lessons default to 80. Standard lessons and flexible requests have defaults of 50 and 25. Within the generation horizon, a valid upcoming part-board occurrence takes priority when a new or rescheduled ordinary booking would block the ride or use up its horse's daily workload. This applies to active recurring templates with effective agreements. Preferred ride times alone do not hold a slot. Existing bookings stay in place, and priority never bypasses availability, entitlement, workload, booking conflicts, or compatibility.
+
+## Environment Variables
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `APP_TIME_ZONE` | `America/Toronto` | Barn-local operational date |
+| `MAX_ACTIVE_PART_BOARDERS_PER_HORSE` | `1` | Maximum concurrent active agreements per horse |
+| `RECURRING_LESSON_GENERATION_WEEKS` | `8` | Forward horizon from the current barn date |
+| `BILLING_ENABLED` | `false` | Disabled billing capability |
+
+## Planning API and database
+
+- `GET /api/part-board` returns agreements, preferences and entitlement summaries. Optional parameters are `date`, `riderId`, and `horseId`.
+- `POST /api/part-board` creates an agreement. `PUT /api/part-board/:id` edits its terms and status.
+- `GET /api/recurring-lessons`, `POST /api/recurring-lessons`, and `PUT /api/recurring-lessons/:id` list, create, and edit weekly templates.
+- `POST /api/recurring-lessons/:id/generate` persists valid occurrences and returns the generation report.
+- Lesson creation and edits accept optional `consumeEntitlement` and a nullable coach on part-board rides.
+
+Apply the additive Prisma migration before starting the updated API against PostgreSQL. It adds agreements, preferred times, entitlement usage, and templates with relational foreign keys and lookup indexes. It makes the Lesson coach nullable and adds agreement and recurrence references while retaining existing data. Entitlement usage is unique per lesson, and recurring occurrences are unique per template and original date. Planning writes use a PostgreSQL transaction and a transaction-scoped lock to coordinate capacity and entitlement checks.
+
+## Known Limitations
+
+Recurrence is weekly and generated on demand. Failed dates require staff review and can be retried after resolving the conflict. Historical occurrences stay on the calendar after a template ends. Authentication, generalized horse recommendations, automatic scheduling, and billing remain deferred.
+
 ### Production launch note
 
 This iteration intentionally does **not** include authentication or authorization. Do not expose real rider, coach, or operational data to users until authentication, role-based access, and Supabase Row Level Security are implemented.
 
 ## Feature Flags
 
-`BILLING_ENABLED=false` remains the API default in Iteration 2. The API rejects invalid values and refuses to start with `BILLING_ENABLED=true` because no active provider is installed. Set environment variables in the API process or hosting environment. `GET /api/config` exposes only the public capability, `{"features":{"billing":false}}`.
+`BILLING_ENABLED=false` remains the API default. The API rejects invalid values and refuses to start with `BILLING_ENABLED=true` because no active provider is installed. Set environment variables in the API process or hosting environment. `GET /api/config` exposes only the public capability, `{"features":{"billing":false}}`.
 
 ## Deferred Billing Architecture
 
@@ -142,8 +203,10 @@ A future billing service will validate the reference, resolve the rider's billin
 - Billing and scheduling are separate bounded contexts. Lessons and other scheduling records contain no payment-provider fields.
 - Billing defaults to disabled. Enabling it without a configured provider stops API startup.
 - Prices use integer minor units. The intended initial currency is CAD, where $75.00 is stored as 7500.
-- Part-board free rides are scheduling entitlements. A future agreement can track rides allowed, rides used, and period dates, with usage recorded independently of provider availability. A subscription may fund the entitlement in a later iteration.
+- Part-board agreements link existing rider and horse records. Ranked preferred times guide planning, while persisted lessons and explicit overrides determine bookings and availability.
+- Part-board free rides are scheduling entitlements. Usage is recorded independently of billing, and every part-board ride counts toward horse workload.
+- Weekly templates generate persisted lessons through normal validation. Generated bookings retain their original occurrence date for duplicate prevention.
 
 ## Next Iteration
 
-Recurring lessons, waitlists, authentication, role-based access, Supabase Row Level Security, part-board agreements, arena scheduling, notifications, and automatic scheduling remain future work. Billing will have its own later iteration.
+Iteration 4 should focus on explainable horse recommendations using compatibility, availability, workload, rider preferences, part-board relationships, and recent pairing history. Billing will have its own later iteration.

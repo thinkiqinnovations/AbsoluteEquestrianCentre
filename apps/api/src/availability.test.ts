@@ -4,6 +4,24 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { evaluateAvailability } from './availability.js';
 import { overlaps } from './intervals.js';
 
+it('saves a new coach and their weekly availability in the first request', async () => {
+  vi.stubEnv('DATABASE_URL', undefined);
+  vi.stubEnv('BILLING_ENABLED', 'false');
+  const api = request((await import('./app.js')).app);
+  const route = '/api/coaches/with-availability';
+  const coach = { firstName: 'Taylor', lastName: 'Example' };
+  await api.post(route).send(coach).expect(400);
+  const weeklyAvailability = [
+    { dayOfWeek: 'MONDAY', startTime: '09:00', endTime: '12:00' },
+    { dayOfWeek: 'THURSDAY', startTime: '13:30', endTime: '18:00' },
+  ];
+  const created = await api.post(route).send({ ...coach, weeklyAvailability }).expect(201);
+  const saved = await api.get(`/api/availability/COACH/${created.body.id}`).expect(200);
+  expect(saved.body.rules).toHaveLength(2);
+  expect(saved.body.rules).toEqual(expect.arrayContaining(weeklyAvailability.map((window) =>
+    expect.objectContaining({ ...window, availabilityType: 'AVAILABLE' }))));
+});
+
 const resource: Resource = { resourceType: 'RIDER', resourceId: 'rider-emma' };
 const date = '2026-11-24';
 const interval = (startTime: string, endTime: string) => ({ startTime, endTime });

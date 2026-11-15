@@ -1,6 +1,7 @@
 import { addDays, barnToday, civilDate, dateValue, weekdays, overrideReasons, type AvailabilityOverride, type AvailabilityRule, type OverrideInput, type Resource, type RuleInput } from '@absolute/shared';
 import { prisma } from './database.js';
-import { id } from './store.js';
+import type { Prisma } from '@prisma/client';
+import { id, memoryAvailabilityRules } from './store.js';
 import { appTimeZone } from './time-zone.js';
 
 type Input = RuleInput | OverrideInput;
@@ -53,7 +54,7 @@ const sampleOverrides: AvailabilityOverride[] = sampleResources.map((resource, i
   reason: (['REST', 'VET', 'PERSONAL', 'SCHOOL_EVENT'] as const)[index],
 }));
 
-function postgresRules(client: NonNullable<typeof prisma>): Repository<RuleInput> {
+function postgresRules(client: Prisma.TransactionClient): Repository<RuleInput> {
   const table = client.availabilityRule;
   return {
     async list(where) {
@@ -67,7 +68,7 @@ function postgresRules(client: NonNullable<typeof prisma>): Repository<RuleInput
   };
 }
 
-function postgresOverrides(client: NonNullable<typeof prisma>): Repository<OverrideInput> {
+function postgresOverrides(client: Prisma.TransactionClient): Repository<OverrideInput> {
   const table = client.availabilityOverride;
   const serialize = (entry: Awaited<ReturnType<typeof table.create>>): AvailabilityOverride => ({
     ...entry, ...timestamps(entry), date: dateValue(entry.date),
@@ -83,9 +84,13 @@ function postgresOverrides(client: NonNullable<typeof prisma>): Repository<Overr
   };
 }
 
-export const rules = prisma ? postgresRules(prisma) : memory<RuleInput>(sampleRules);
+memoryAvailabilityRules.push(...sampleRules);
+export const rules = prisma ? postgresRules(prisma) : memory<RuleInput>(memoryAvailabilityRules);
 export const overrides = prisma ? postgresOverrides(prisma) : memory<OverrideInput>(sampleOverrides);
-export async function availabilityRecords(resource?: Resource) {
-  const [weeklyRules, dateOverrides] = await Promise.all([rules.list(resource), overrides.list(resource)]);
+export async function availabilityRecords(resource?: Resource, client?: Prisma.TransactionClient) {
+  const [weeklyRules, dateOverrides] = await Promise.all([
+    (client ? postgresRules(client) : rules).list(resource),
+    (client ? postgresOverrides(client) : overrides).list(resource),
+  ]);
   return { rules: weeklyRules, overrides: dateOverrides };
 }

@@ -5,5 +5,5 @@ export type Horse = Entity<HorseInput>;
 export type RiderPreference = { horseId: string; notes?: string; preferenceOrder: number };
 export type Rider = Omit<Entity<RiderInput>, 'preferences'> & { preferences: RiderPreference[] };
 export type Coach = Entity<CoachInput>;
-export type Lesson = Entity<LessonInput>;
+export type Lesson = Entity<LessonInput> & { partBoardAgreementId?: string | null; recurringTemplateId?: string | null; occurrenceDate?: string };
 export type Conflict = { code: string; severity: 'ERROR' | 'WARNING'; message: string };

@@ -34,6 +34,8 @@ enum LessonStatus {
 }
 
 model Horse {
+  partBoardAgreements PartBoardAgreement[]
+  recurringTemplates RecurringLessonTemplate[]
   id                    String                 @id @default(cuid())
   name                  String
   active                Boolean                @default(true)
@@ -54,6 +56,8 @@ model Horse {
 }
 
 model Rider {
+  partBoardAgreements PartBoardAgreement[]
+  recurringTemplates RecurringLessonTemplate[]
   id           String                 @id @default(cuid())
   firstName    String
   lastName     String
@@ -81,6 +85,7 @@ model RiderHorsePreference {
 }
 
 model Coach {
+  recurringTemplates RecurringLessonTemplate[]
   id        String   @id @default(cuid())
   firstName String
   lastName  String
@@ -98,7 +103,11 @@ model Lesson {
   endTime    String
   riderId    String
   horseId    String
-  coachId    String
+  coachId    String?
+  partBoardAgreementId String?
+  consumeEntitlement Boolean @default(false)
+  recurringTemplateId String?
+  occurrenceDate DateTime? @db.Date
   lessonType LessonType
   discipline Discipline
   rideUnits  Decimal      @db.Decimal(4, 2)
@@ -106,13 +115,112 @@ model Lesson {
   notes      String?
   rider      Rider        @relation(fields: [riderId], references: [id])
   horse      Horse        @relation(fields: [horseId], references: [id])
-  coach      Coach        @relation(fields: [coachId], references: [id])
+  coach Coach? @relation(fields: [coachId], references: [id], onDelete: Restrict)
+  partBoardAgreement PartBoardAgreement? @relation(fields: [partBoardAgreementId], references: [id], onDelete: Restrict)
+  recurringTemplate RecurringLessonTemplate? @relation(fields: [recurringTemplateId], references: [id], onDelete: Restrict)
+  entitlementUsage PartBoardEntitlementUsage?
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
 
   @@index([date, horseId])
   @@index([date, riderId])
   @@index([date, coachId])
+  @@unique([recurringTemplateId, occurrenceDate])
+}
+
+enum PartBoardAgreementStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+  CANCELLED
+}
+
+enum EntitlementPeriod {
+  WEEK
+  MONTH
+}
+
+enum RecurringTemplateStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+model PartBoardAgreement {
+  id String @id @default(cuid())
+  riderId String
+  horseId String
+  status PartBoardAgreementStatus
+  startDate DateTime @db.Date
+  endDate DateTime? @db.Date
+  priority Int @default(100)
+  freeRidesPerPeriod Int
+  entitlementPeriod EntitlementPeriod
+  notes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  rider Rider @relation(fields: [riderId], references: [id])
+  horse Horse @relation(fields: [horseId], references: [id])
+  preferredRideTimes PartBoardPreferredRideTime[]
+  entitlementUsages PartBoardEntitlementUsage[]
+  recurringTemplates RecurringLessonTemplate[]
+  lessons Lesson[]
+  @@index([riderId, status])
+  @@index([horseId, status])
+  @@index([horseId, startDate, endDate])
+}
+
+model PartBoardPreferredRideTime {
+  id String @id @default(cuid())
+  agreementId String
+  dayOfWeek DayOfWeek
+  startTime String
+  endTime String
+  preferenceRank Int
+  notes String?
+  agreement PartBoardAgreement @relation(fields: [agreementId], references: [id])
+  @@unique([agreementId, preferenceRank])
+}
+
+model PartBoardEntitlementUsage {
+  id String @id @default(cuid())
+  agreementId String
+  lessonId String @unique
+  entitlementDate DateTime @db.Date
+  quantity Int @default(1)
+  reversedAt DateTime?
+  createdAt DateTime @default(now())
+  agreement PartBoardAgreement @relation(fields: [agreementId], references: [id])
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+  @@index([agreementId, entitlementDate])
+}
+
+model RecurringLessonTemplate {
+  id String @id @default(cuid())
+  riderId String
+  horseId String
+  coachId String?
+  partBoardAgreementId String?
+  dayOfWeek DayOfWeek
+  startTime String
+  endTime String
+  lessonType LessonType
+  discipline Discipline
+  rideUnits Decimal @db.Decimal(4, 2)
+  startDate DateTime @db.Date
+  endDate DateTime? @db.Date
+  status RecurringTemplateStatus
+  schedulingPriority Int
+  consumeEntitlement Boolean @default(false)
+  notes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  rider Rider @relation(fields: [riderId], references: [id])
+  horse Horse @relation(fields: [horseId], references: [id])
+  coach Coach? @relation(fields: [coachId], references: [id], onDelete: Restrict)
+  partBoardAgreement PartBoardAgreement? @relation(fields: [partBoardAgreementId], references: [id], onDelete: Restrict)
+  lessons Lesson[]
+  @@index([status, startDate, endDate])
 }
 
 enum AvailabilityResourceType {

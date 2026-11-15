@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { intervalSchema, ordered } from './scheduling.js';
 export * from './scheduling.js';
+export * from './part-board.js';
 
 export const riderLevels = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const;
 export const lessonTypes = ['PRIVATE', 'SEMI_PRIVATE', 'GROUP', 'PART_BOARD_RIDE'] as const;
@@ -57,18 +58,25 @@ export const coachSchema = z.object({
   notes: optionalText,
 });
 
-export const lessonSchema = z.object({
+export const lessonFields = z.object({
   date: z.string().date(),
   ...intervalSchema.shape,
   riderId: z.string().min(1),
   horseId: z.string().min(1),
-  coachId: z.string().min(1),
+  coachId: z.string().min(1).nullish(),
+  consumeEntitlement: z.boolean().optional(),
   lessonType: z.enum(lessonTypes),
   discipline: z.enum(disciplines),
   rideUnits: z.coerce.number().positive().max(10),
   status: z.enum(lessonStatuses),
   notes: optionalText,
-}).refine(ordered, { message: 'End time must be after start time.', path: ['endTime'] });
+});
+export const lessonSchema = lessonFields.superRefine((lesson, context) => {
+  if (!ordered(lesson)) context.addIssue({ code: 'custom', message: 'End time must be after start time.', path: ['endTime'] });
+  if (lesson.lessonType !== 'PART_BOARD_RIDE' && !lesson.coachId) {
+    context.addIssue({ code: 'custom', message: 'Select a coach.', path: ['coachId'] });
+  }
+});
 
 export type HorseInput = z.infer<typeof horseSchema>;
 export type RiderInput = z.infer<typeof riderSchema>;

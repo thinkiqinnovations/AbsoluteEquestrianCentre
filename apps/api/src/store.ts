@@ -1,12 +1,18 @@
 import type { Coach, Horse, Lesson, Rider } from './types.js';
-import { barnToday, monday, weekDates } from '@absolute/shared';
+import { barnToday, monday, monthRange, weekDates, type AvailabilityRule } from '@absolute/shared';
 import { appTimeZone } from './time-zone.js';
 
 const now = () => new Date().toISOString();
 const make = <T extends object>(id: string, input: T) => ({ ...input, id, createdAt: now(), updatedAt: now() });
 const today = barnToday(appTimeZone);
+export const memoryAvailabilityRules: AvailabilityRule[] = [];
 
-const weeklyLessons = weekDates(monday(today)).filter((date) => date !== today).map((date, index): Lesson =>
+const currentWeek = weekDates(monday(today));
+const currentMonth = monthRange(Number(today.slice(0, 4)), Number(today.slice(5, 7)));
+const demoDates = new Set([...currentWeek, ...currentMonth.dates.filter((_, index) => index % 2 === 0)]);
+demoDates.delete(today);
+
+const demoLessons = [...demoDates].sort().map((date, index): Lesson =>
   make(`lesson-demo-${date}`, {
     date,
     startTime: index % 2 === 0 ? '10:30' : '14:00',
@@ -18,7 +24,7 @@ const weeklyLessons = weekDates(monday(today)).filter((date) => date !== today).
     discipline: 'FLAT',
     rideUnits: 0.75,
     status: 'CONFIRMED',
-    notes: 'Sample weekly lesson',
+    notes: 'Sample calendar lesson',
   }));
 
 export const store: { horses: Horse[]; riders: Rider[]; coaches: Coach[]; lessons: Lesson[] } = {
@@ -41,7 +47,7 @@ export const store: { horses: Horse[]; riders: Rider[]; coaches: Coach[]; lesson
     make('lesson-1', { date: today, startTime: '09:00', endTime: '10:00', riderId: 'rider-emma', horseId: 'horse-jasper', coachId: 'coach-sarah', lessonType: 'PRIVATE', discipline: 'FLAT', rideUnits: 1, status: 'CONFIRMED', notes: '' }),
     make('lesson-2', { date: today, startTime: '10:30', endTime: '11:15', riderId: 'rider-noah', horseId: 'horse-willow', coachId: 'coach-james', lessonType: 'PRIVATE', discipline: 'FLAT', rideUnits: 0.75, status: 'CONFIRMED', notes: '' }),
     make('lesson-3', { date: today, startTime: '14:00', endTime: '15:00', riderId: 'rider-olivia', horseId: 'horse-atlas', coachId: 'coach-sarah', lessonType: 'PRIVATE', discipline: 'JUMP', rideUnits: 1, status: 'DRAFT', notes: '' }),
-    ...weeklyLessons,
+    ...demoLessons,
   ],
 };
 

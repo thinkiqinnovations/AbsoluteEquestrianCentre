@@ -10,11 +10,11 @@ export function validateLesson(candidate: LessonInput, snapshot: SchedulerSnapsh
   if (conflicts.some(({ code }) => code === 'REFERENCE_NOT_FOUND')) return conflicts;
   const rider = snapshot.riders.find(({ id }) => id === candidate.riderId)!;
   const horse = snapshot.horses.find(({ id }) => id === candidate.horseId)!;
-  const coach = snapshot.coaches.find(({ id }) => id === candidate.coachId)!;
+  const coach = snapshot.coaches.find(({ id }) => id === candidate.coachId);
   const resources = [
     { resourceType: 'RIDER', resourceId: rider.id, name: `${rider.firstName} ${rider.lastName}` },
     { resourceType: 'HORSE', resourceId: horse.id, name: horse.name },
-    { resourceType: 'COACH', resourceId: coach.id, name: `${coach.firstName} ${coach.lastName}` },
+    ...(coach ? [{ resourceType: 'COACH' as const, resourceId: coach.id, name: `${coach.firstName} ${coach.lastName}` }] : []),
   ] as const;
   for (const resource of resources) {
     const { status, reason } = evaluateAvailability(records, resource, candidate.date, candidate);
