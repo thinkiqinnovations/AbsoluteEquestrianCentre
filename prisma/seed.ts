@@ -3,6 +3,7 @@ import { sampleOverrides, sampleRules } from '../apps/api/src/availability-store
 import { prisma } from '../apps/api/src/database.js';
 import { demoAgreements, demoPartBoardLessons, demoTemplates, demoUsage, PlanningRepository } from '../apps/api/src/planning-repository.js';
 import { demoTimestamp, store } from '../apps/api/src/store.js';
+import { demoLessonPayments, demoMonthlyPayments } from '../apps/api/src/payment-demo.js';
 
 async function seed() {
   if (!prisma || process.env.DEMO_SEED !== '1' || process.env.NODE_ENV === 'production' ||
@@ -82,6 +83,16 @@ async function seed() {
           where: { lessonId }, create: { id: `usage-${lessonId}`, lessonId, createdAt: timestamp, ...usage }, update: usage,
         });
       }
+    }
+    for (const { lessonId, status } of demoLessonPayments) {
+      await db.lessonPaymentStatus.upsert({
+        where: { lessonId }, create: { lessonId, status, updatedAt: timestamp }, update: { status, updatedAt: timestamp },
+      });
+    }
+    for (const { status, ...key } of demoMonthlyPayments) {
+      await db.riderMonthlyPaymentStatus.upsert({
+        where: { riderId_month_kind: key }, create: { ...key, status, updatedAt: timestamp }, update: { status, updatedAt: timestamp },
+      });
     }
   }, { timeout: 30000 });
   console.log('Seeded fictional scheduling, availability, part-board, and recurrence demos.');

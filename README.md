@@ -83,6 +83,7 @@ The dataset includes:
 - Recurring availability for all three resource types, plus dated exceptions. Some resources demonstrate unconfigured availability.
 - Active and ended part-board agreements, ranked ride preferences, and available, partially used, and exhausted entitlements.
 - Regular and part-board recurring templates with persisted occurrences. Select **Generate lessons** for Emma's recurring ride to see a failed occurrence caused by Sassy's rest override.
+- Fictional paid, unpaid, and unrecorded examples for lesson, monthly, and part-board payment status.
 
 ### Populate or refresh a PostgreSQL demo
 
@@ -218,6 +219,10 @@ Recurrence is weekly and generated on demand. Failed dates require staff review 
 ### Production launch note
 
 This iteration intentionally does **not** include authentication or authorization. Do not expose real rider, coach, or operational data to users until authentication, role-based access, and Supabase Row Level Security are implemented.
+
+## Manual Payment Status
+
+Daily Schedule and Riders support manual payment status for payments recorded outside the scheduler. Lesson status follows the individual booking. Monthly and part-board status are separate records keyed by rider and barn-local calendar month. Status can be paid, unpaid, or unrecorded. These indicators do not affect bookings or entitlement usage. The billing configuration remains independent.
 
 ## Feature Flags
 

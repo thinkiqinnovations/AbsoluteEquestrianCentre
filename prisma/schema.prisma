@@ -56,6 +56,7 @@ model Horse {
 }
 
 model Rider {
+  monthlyPaymentStatuses RiderMonthlyPaymentStatus[]
   partBoardAgreements PartBoardAgreement[]
   recurringTemplates RecurringLessonTemplate[]
   id           String                 @id @default(cuid())
@@ -97,6 +98,7 @@ model Coach {
 }
 
 model Lesson {
+  paymentStatus LessonPaymentStatus?
   id         String       @id @default(cuid())
   date       DateTime     @db.Date
   startTime  String
@@ -273,4 +275,34 @@ model AvailabilityOverride {
   updatedAt DateTime @updatedAt
 
   @@index([resourceType, resourceId, date])
+}
+
+enum RecordedPaymentStatus {
+  PAID
+  UNPAID
+  UNRECORDED
+}
+
+enum MonthlyPaymentKind {
+  MONTHLY
+  PART_BOARD
+}
+
+model LessonPaymentStatus {
+  lessonId  String                @id
+  status    RecordedPaymentStatus
+  updatedAt DateTime              @updatedAt
+  lesson    Lesson                @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+}
+
+model RiderMonthlyPaymentStatus {
+  riderId   String
+  month     String
+  kind      MonthlyPaymentKind
+  status    RecordedPaymentStatus
+  updatedAt DateTime              @updatedAt
+  rider     Rider                 @relation(fields: [riderId], references: [id], onDelete: Cascade)
+
+  @@id([riderId, month, kind])
+  @@index([month])
 }

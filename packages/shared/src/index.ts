@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { intervalSchema, ordered } from './scheduling.js';
 export * from './scheduling.js';
 export * from './part-board.js';
+export * from './payment-status.js';
 
 export const riderLevels = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const;
 export const lessonTypes = ['PRIVATE', 'SEMI_PRIVATE', 'GROUP', 'PART_BOARD_RIDE'] as const;

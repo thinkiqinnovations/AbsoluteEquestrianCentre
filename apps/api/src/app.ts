@@ -3,6 +3,7 @@ import express from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { validationError } from './validation-error.js';
+import { paymentStatusRouter } from './payment-status-router.js';
 import { coachWeeklyAvailabilitySchema, lessonFields, monthRange } from '@absolute/shared';
 import { planningRouter } from './planning-router.js';
 import { planningWrite } from './planning-repository.js';
@@ -34,6 +35,7 @@ app.get('/api/config', (_req, res) => res.json({ features: { billing: billingPro
 
 app.get('/api/schedule/settings', (_req, res) => res.json({ timeZone: appTimeZone }));
 app.use('/api/availability', availabilityRouter);
+app.use('/api/payment-status', paymentStatusRouter);
 app.use('/api', planningRouter);
 app.get('/api/horses', async (_req, res, next) => { try { res.json(await database.horses()); } catch (error) { next(error); } });
 app.post('/api/horses', async (req, res, next) => { const input = parse(horseSchema, req.body, res); if (!input) return; try { res.status(201).json(await database.createHorse(input)); } catch (error) { next(error); } });
