@@ -4,9 +4,9 @@ Absolute Equestrian Scheduler is a TypeScript monorepo for managing school horse
 
 ## Development Status
 
-**Iteration 3 adds part boarding and weekly recurring lessons.** Day, Week, and Month scheduling, horse/rider/coach management, ranked horse preferences, availability, shared-coach lessons, and the Render/Supabase deployment path are supported.
+**Iteration 4 adds explainable horse recommendations to Add/Edit Lesson.** Day, Week, and Month scheduling, availability, shared-coach bookings, part boarding, recurring lessons, and manual payment-status records remain available.
 
-Implemented through Iteration 3:
+Implemented through Iteration 4:
 
 - React, Vite, Material UI, React Router, and TanStack Query frontend
 - Express and TypeScript API with Zod request validation
@@ -22,8 +22,9 @@ Implemented through Iteration 3:
 - Lesson editing, recurring availability, date overrides, and server-side availability validation
 - Part-board agreements, ranked ride preferences, weekly and monthly entitlements, and linked horse and rider profiles
 - Weekly lesson and self-ride templates with persisted occurrences, generation reports, and duplicate prevention
+- Deterministic horse eligibility, ranking, and explanations in Add/Edit Lesson
 
-Authentication, automatic schedule generation, horse recommendations, and billing functionality are deferred.
+Authentication, automatic schedule generation, and active billing are deferred.
 
 - [x] Billing feature capability flag
 - [x] Provider-independent billing interface
@@ -84,6 +85,9 @@ The dataset includes:
 - Active and ended part-board agreements, ranked ride preferences, and available, partially used, and exhausted entitlements.
 - Regular and part-board recurring templates with persisted occurrences. Select **Generate lessons** for Emma's recurring ride to see a failed occurrence caused by Sassy's rest override.
 - Fictional paid, unpaid, and unrecorded examples for lesson, monthly, and part-board payment status.
+- Recommendation fixtures for Emma Roberts include ranked preferences, recent completed assignments on Sassy, and a Sassy farrier override two days after seeding from 4–5 PM.
+
+To try recommendations, open Add Lesson for Emma. Choose a **Flat** private lesson tomorrow at **3–4 PM** for **0.75 ride units** to see Sassy's preference and history score. Move it to **4–5 PM two days after seeding** to see the farrier exclusion and Lindon as an eligible alternative. Try **Jump** to see the jump-capability and rider-level exclusions. Today's workload excludes horses when a proposed ride would push them above their capacity. For a **Part-board ride**, choose tomorrow at **3–4 PM** and clear the free-ride entitlement checkbox if the demo allowance is exhausted. Sassy is the only linked horse for Emma.
 
 ### Populate or refresh a PostgreSQL demo
 
@@ -200,6 +204,7 @@ Part-board recurring rides default to 100 and other recurring lessons default to
 | `APP_TIME_ZONE` | `America/Toronto` | Barn-local operational date |
 | `MAX_ACTIVE_PART_BOARDERS_PER_HORSE` | `1` | Maximum concurrent active agreements per horse |
 | `RECURRING_LESSON_GENERATION_WEEKS` | `8` | Forward horizon from the current barn date |
+| `HORSE_RECOMMENDATION_HISTORY_DAYS` | `30` | Lookback for prior rider assignments, from 1 to 365 days |
 | `BILLING_ENABLED` | `false` | Disabled billing capability |
 
 ## Planning API and database
@@ -212,9 +217,58 @@ Part-board recurring rides default to 100 and other recurring lessons default to
 
 Apply the additive Prisma migration before starting the updated API against PostgreSQL. It adds agreements, preferred times, entitlement usage, and templates with relational foreign keys and lookup indexes. It makes the Lesson coach nullable and adds agreement and recurrence references while retaining existing data. Entitlement usage is unique per lesson, and recurring occurrences are unique per template and original date. Planning writes use a PostgreSQL transaction and a transaction-scoped lock to coordinate capacity and entitlement checks.
 
+## Horse Recommendation Engine
+
+Add/Edit Lesson sends the rider, barn-local date and time, lesson type, discipline, and proposed ride units to the API. It also sends the coach when selected, the entitlement choice for part-board rides, and the booking ID when editing. The API loads the day's schedule, availability, preferences, agreements, and recent rider history in batches. It calculates advisory scores for all horses and flags bookings that require review. Staff can select any horse from the cards or grouped selector, while save still enforces the scheduling rules.
+
+### Hard Eligibility Rules
+
+Eligibility requires an active horse that supports the requested discipline and rider level. The existing half-open booking rules, horse workload ceiling, explicitly unavailable windows, rider conflicts, and selected-coach conflicts still apply. Unspecified availability is a warning. Protected recurring part-board rides and part-board agreement and entitlement requirements are checked through the same domain rules used on save. When editing, the current booking is excluded from overlap, workload, and entitlement calculations. A preview does not reserve the horse. Save validates again against current state.
+
+### Recommendation Scoring
+
+These weights are initial development assumptions. No score changes eligibility.
+
+| Factor | Points |
+| --- | ---: |
+| Base | 50 |
+| Rider preference ranks 1, 2, 3, and 4+ | +25, +15, +10, +5 |
+| Active rider–horse part-board agreement | +30 |
+| Part-board ride fully inside its preferred window | +10 |
+| Prior assignment within the lookback | +8 |
+| Same horse for the last three assignments, excluding part-board rides | −5 |
+| Projected workload at most 50% | +10 |
+| Projected workload above 50% and below 75% | +5 |
+| Projected workload from 75% to below 100% | 0 |
+| Projected workload at or above 100% | −10 |
+
+Workload uses current daily units plus the proposed ride. History counts confirmed or completed assignments before the requested slot, through the current barn-local date. Prior assignment records do not establish how a ride went. Ranking uses score, lower projected utilization, higher rider preference, alphabetical horse name, then stable horse ID.
+
+### Recommendation Explanations and Ruleset
+
+Eligible horses return a base score, score impacts with reason codes and descriptions, an overall score, a rank, a workload projection, and separate warnings. Horses with booking concerns also return a score, workload, and separate score impacts alongside the blocking reasons. API responses include `rulesetVersion` (`1.1`) to identify the current scoring rules and `evaluatedAt` to identify when the preview was calculated. Payment status and billing are independent of recommendations.
+
+### Recommendation API
+
+`POST /api/recommendations/horses` accepts JSON. For example
+
+```json
+{
+  "riderId": "rider-emma",
+  "date": "2026-11-15",
+  "startTime": "15:00",
+  "endTime": "16:00",
+  "lessonType": "PRIVATE",
+  "discipline": "FLAT",
+  "rideUnits": 0.75
+}
+```
+
+Optional fields are `coachId`, `excludeLessonId`, and `consumeEntitlement`. The response echoes the request and rider ID and includes ranked `recommendations` and `ineligible` entries. Each entry has `horseId`, `horseName`, `eligible`, `score`, `reasons`, and `warnings`. All entries have `baseScore` and `workload`. Recommendations include a `rank`. Review entries include `scoreReasons` separately from their booking concerns.
+
 ## Known Limitations
 
-Recurrence is weekly and generated on demand. Failed dates require staff review and can be retried after resolving the conflict. Historical occurrences stay on the calendar after a template ends. Authentication, generalized horse recommendations, automatic scheduling, and billing remain deferred.
+Recurrence is weekly and generated on demand. Failed dates require staff review and can be retried after resolving the conflict. Historical occurrences stay on the calendar after a template ends. Recommendations are calculated per rider, including shared-coach lessons. A part-board ride requires an eligible linked horse. Weights still need review by school staff. Authentication, automatic scheduling, and active billing remain deferred.
 
 ### Production launch note
 
@@ -259,4 +313,4 @@ A future billing service will validate the reference, resolve the rider's billin
 
 ## Next Iteration
 
-Iteration 4 should focus on explainable horse recommendations using compatibility, availability, workload, rider preferences, part-board relationships, and recent pairing history. Billing will have its own later iteration.
+Iteration 5 should focus on generating draft schedules from rider requests, availability, workload, recommendations, part-board priority, and recurring commitments. Drafts should explain unresolved requests and require manual approval before publishing.

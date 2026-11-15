@@ -142,6 +142,15 @@ export class PlanningRepository {
       .map(({ occurrenceDate }) => occurrenceDate && dateValue(occurrenceDate));
   }
 
+  async occurrenceTemplatesOnDate(templateIds: string[], date: string): Promise<string[]> {
+    if (!this.client) return store.lessons.flatMap((lesson) => lesson.occurrenceDate === date &&
+      lesson.recurringTemplateId && templateIds.includes(lesson.recurringTemplateId) ? [lesson.recurringTemplateId] : []);
+    return (await this.client.lesson.findMany({
+      where: { recurringTemplateId: { in: templateIds }, occurrenceDate: civilDate(date) },
+      select: { recurringTemplateId: true },
+    })).flatMap(({ recurringTemplateId }) => recurringTemplateId ? [recurringTemplateId] : []);
+  }
+
   async saveTemplate(template: Template, existing: boolean) {
     if (!this.client) {
       if (existing) demoTemplates.splice(demoTemplates.findIndex(({ id }) => id === template.id), 1, template);

@@ -51,6 +51,11 @@ export const store: { horses: Horse[]; riders: Rider[]; coaches: Coach[]; lesson
     make('lesson-2', { date: today, startTime: '10:30', endTime: '11:15', riderId: 'rider-noah', horseId: 'horse-willow', coachId: 'coach-james', lessonType: 'PRIVATE', discipline: 'FLAT', rideUnits: 0.75, status: 'CONFIRMED', notes: '' }),
     make('lesson-3', { date: today, startTime: '14:00', endTime: '15:00', riderId: 'rider-olivia', horseId: 'horse-atlas', coachId: 'coach-sarah', lessonType: 'PRIVATE', discipline: 'JUMP', rideUnits: 1, status: 'DRAFT', notes: '' }),
     ...demoLessons,
+    ...[2, 4, 6].map((days): Lesson => make(`recommendation-history-${days}`, {
+      date: addDays(today, -days), startTime: '16:00', endTime: '16:45', riderId: 'rider-emma', horseId: 'horse-jasper',
+      coachId: 'coach-sarah', lessonType: 'PRIVATE', discipline: 'FLAT', rideUnits: 0.5, status: 'COMPLETED',
+      notes: 'Fictional pairing history for recommendation demos.',
+    })),
   ],
 };
 

@@ -111,7 +111,8 @@ it('creates a part-board agreement, manages its status, and reports recurring ge
 
 it('navigates views, filters and opens month results in the shared lesson workflow', async () => {
   const calls: string[] = [];
-  vi.stubGlobal('fetch', vi.fn(async (path: string) => {
+  const previews: Record<string, unknown>[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (path: string, options?: RequestInit) => {
     const url = new URL(path, 'http://localhost');
     calls.push(url.pathname);
     let body: unknown = [];
@@ -129,6 +130,16 @@ it('navigates views, filters and opens month results in the shared lesson workfl
     if (url.pathname === '/api/riders') body = [{ ...person, active: true }];
     if (url.pathname === '/api/horses') body = [{ ...lesson.horse, active: true }];
     if (url.pathname === '/api/coaches') body = [{ ...lesson.coach, active: true }];
+    if (url.pathname === '/api/recommendations/horses') {
+      previews.push(JSON.parse(String(options?.body)));
+      const recommendation = { eligible: true, workload: { current: 0, proposed: 1, projected: 1, maximum: 1.5 },
+        baseScore: 50, reasons: [{ code: 'FIRST_PREFERENCE', impact: 25, description: 'Rider preference rank 1.' }], warnings: [] };
+      body = { recommendations: [
+        { ...recommendation, rank: 1, horseId: 'jasper', horseName: 'Sassy', score: 75 },
+        { ...recommendation, rank: 2, horseId: 'lindon', horseName: 'Lindon', score: 50, reasons: [] },
+      ], ineligible: [{ ...recommendation, horseId: 'atlas', horseName: 'Atlas', eligible: false, score: 50, scoreReasons: [],
+        reasons: [{ code: 'RIDER_LEVEL_INCOMPATIBLE', description: 'Rider level is incompatible.' }] }] };
+    }
     return { ok: true, json: async () => body };
   }));
   client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
@@ -159,6 +170,17 @@ it('navigates views, filters and opens month results in the shared lesson workfl
   await click('Clear filters');
   await click('Edit Emma Roberts on 2026-11-18 at 15:30');
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Edit Lesson');
+  await waitFor(() => expect(button('Select Lindon')).toBeDefined());
+  expect(previews.at(-1)).toMatchObject({ excludeLessonId: 'lesson-0', riderId: 'emma', date });
+  expect(document.querySelector('[role="dialog"]')?.textContent).toMatch(/#1 Sassy.*75 points.*Projected workload.*Rider preference rank 1.*#2 Lindon/);
+  expect(document.querySelector('[role="dialog"] details')?.textContent).toContain('Rider level is incompatible.');
+  expect(document.querySelector('[role="dialog"] details')?.textContent).toContain('Atlas · 50 points');
+  await click('Select Atlas');
+  expect(button('Atlas selected')?.disabled).toBe(true);
+  await click('Select Lindon');
+  expect(button('Lindon selected')?.disabled).toBe(true);
+  await click('Select Sassy');
+  expect(button('Sassy selected')?.disabled).toBe(true);
   await click('Cancel');
   await click('+2 more');
   expect(location()).toBe(`?view=day&date=${date}`);

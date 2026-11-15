@@ -4,8 +4,8 @@ import { findConflicts } from './conflicts.js';
 import { evaluateAvailability } from './availability.js';
 import type { Conflict } from './types.js';
 
-export function validateLesson(candidate: LessonInput, snapshot: SchedulerSnapshot, records: AvailabilityRecords, ignoredId?: string) {
-  const conflicts = findConflicts(candidate, snapshot, ignoredId);
+export function validateLesson(candidate: LessonInput, snapshot: SchedulerSnapshot, records: AvailabilityRecords, ignoredId?: string, allowUnselectedCoach = false) {
+  const conflicts = findConflicts(candidate, snapshot, ignoredId, allowUnselectedCoach);
   if (candidate.status === 'CANCELLED') return conflicts.filter(({ code }) => code === 'REFERENCE_NOT_FOUND');
   if (conflicts.some(({ code }) => code === 'REFERENCE_NOT_FOUND')) return conflicts;
   const rider = snapshot.riders.find(({ id }) => id === candidate.riderId)!;

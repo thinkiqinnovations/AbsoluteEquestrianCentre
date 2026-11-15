@@ -4,9 +4,10 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { validationError } from './validation-error.js';
 import { paymentStatusRouter } from './payment-status-router.js';
-import { coachWeeklyAvailabilitySchema, lessonFields, monthRange } from '@absolute/shared';
+import { coachWeeklyAvailabilitySchema, horseRecommendationSchema, lessonFields, monthRange } from '@absolute/shared';
+import { evaluateHorseRecommendations } from './horse-recommendations.js';
 import { planningRouter } from './planning-router.js';
-import { planningWrite } from './planning-repository.js';
+import { planning, planningWrite } from './planning-repository.js';
 import { scheduleLesson } from './planning-service.js';
 import { WORKLOAD_THRESHOLDS, barnToday, coachSchema, dateSchema, horseSchema, lessonSchema, riderSchema, weekDates, weekStartSchema } from '@absolute/shared';
 import { availabilityRouter } from './availability-router.js';
@@ -37,6 +38,18 @@ app.get('/api/schedule/settings', (_req, res) => res.json({ timeZone: appTimeZon
 app.use('/api/availability', availabilityRouter);
 app.use('/api/payment-status', paymentStatusRouter);
 app.use('/api', planningRouter);
+app.post('/api/recommendations/horses', async (req, res, next) => {
+  const input = parse(horseRecommendationSchema, req.body, res);
+  if (!input) return;
+  try {
+    const result = await evaluateHorseRecommendations(planning, input);
+    return 'missing' in result
+      ? res.status(404).json({ error: { code: 'NOT_FOUND', message: `The selected ${result.missing} could not be found.` } })
+      : res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
 app.get('/api/horses', async (_req, res, next) => { try { res.json(await database.horses()); } catch (error) { next(error); } });
 app.post('/api/horses', async (req, res, next) => { const input = parse(horseSchema, req.body, res); if (!input) return; try { res.status(201).json(await database.createHorse(input)); } catch (error) { next(error); } });
 app.get('/api/horses/:id', async (req, res, next) => { try { const entity = await database.horse(req.params.id); return entity ? res.json(entity) : notFound(res); } catch (error) { next(error); } });

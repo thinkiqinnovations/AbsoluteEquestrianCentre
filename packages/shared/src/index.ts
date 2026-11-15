@@ -79,6 +79,34 @@ export const lessonSchema = lessonFields.superRefine((lesson, context) => {
   }
 });
 
+export const horseRecommendationSchema = lessonFields.pick({
+  riderId: true, date: true, startTime: true, endTime: true, lessonType: true,
+  discipline: true, rideUnits: true, coachId: true, consumeEntitlement: true,
+}).extend({ excludeLessonId: z.string().min(1).optional() })
+  .refine(ordered, { message: 'End time must be after start time.', path: ['endTime'] });
+
+export type HorseRecommendationRequest = z.infer<typeof horseRecommendationSchema>;
+export type RecommendationReason = { code: string; description: string };
+type RecommendationHorse = { horseId: string; horseName: string; warnings: RecommendationReason[] };
+export type HorseRecommendation = RecommendationHorse & {
+  eligible: true; score: number; rank: number; baseScore: number;
+  workload: { current: number; proposed: number; projected: number; maximum: number };
+  reasons: (RecommendationReason & { impact: number })[];
+};
+export type IneligibleHorse = RecommendationHorse & Pick<HorseRecommendation, 'score' | 'baseScore' | 'workload'> & {
+  eligible: false;
+  reasons: RecommendationReason[];
+  scoreReasons: HorseRecommendation['reasons'];
+};
+export type HorseRecommendationResult = {
+  riderId: string;
+  request: HorseRecommendationRequest;
+  rulesetVersion: string;
+  evaluatedAt: string;
+  recommendations: HorseRecommendation[];
+  ineligible: IneligibleHorse[];
+};
+
 export type HorseInput = z.infer<typeof horseSchema>;
 export type RiderInput = z.infer<typeof riderSchema>;
 export type CoachInput = z.infer<typeof coachSchema>;

@@ -46,11 +46,14 @@ export const sampleRules = sampleResources.flatMap((resource) => weekdays.map((d
   ...resource, ...seedMetadata(`rule-${resource.resourceId}-${dayOfWeek}`), dayOfWeek,
   startTime: '08:00', endTime: '20:00', availabilityType: 'AVAILABLE',
 })));
-export const sampleOverrides: AvailabilityOverride[] = sampleResources.map((resource, index) => ({
+export const sampleOverrides: AvailabilityOverride[] = [...sampleResources.map((resource, index): AvailabilityOverride => ({
   ...resource, ...seedMetadata(`override-${resource.resourceId}`), date: addDays(demoToday, index + 1),
   startTime: '17:00', endTime: '19:00', availabilityType: 'UNAVAILABLE',
   reason: (['REST', 'VET', 'PERSONAL', 'SCHOOL_EVENT'] as const)[index],
-}));
+})), {
+  ...seedMetadata('override-recommendation-farrier'), resourceType: 'HORSE', resourceId: 'horse-jasper',
+  date: addDays(demoToday, 2), startTime: '16:00', endTime: '17:00', availabilityType: 'UNAVAILABLE', reason: 'FARRIER',
+}];
 
 function postgresRules(client: Prisma.TransactionClient): Repository<RuleInput> {
   const table = client.availabilityRule;

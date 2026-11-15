@@ -32,6 +32,7 @@ export interface SchedulerDatabase {
   createCoach(input: CoachInput, weeklyAvailability?: CoachWeeklyAvailability): Promise<Coach>;
   updateCoach(id: string, input: CoachInput): Promise<Coach | undefined>;
   lessons(date?: string): Promise<Lesson[]>;
+  riderHistory(riderId: string, start: string, end: string): Promise<Lesson[]>;
   lesson(id: string): Promise<Lesson | undefined>;
   createLesson(input: LessonInput): Promise<Lesson>;
   updateLesson(id: string, input: LessonInput): Promise<Lesson | undefined>;
@@ -69,6 +70,10 @@ class MemoryDatabase implements SchedulerDatabase {
   }
   async updateCoach(entityId: string, input: CoachInput) { const index = store.coaches.findIndex((item) => item.id === entityId); if (index < 0) return undefined; store.coaches[index] = { ...store.coaches[index], ...input, updatedAt: new Date().toISOString() }; return store.coaches[index]; }
   async lessons(date?: string) { return date ? store.lessons.filter((item) => item.date === date) : store.lessons; }
+  async riderHistory(riderId: string, start: string, end: string) {
+    return store.lessons.filter((lesson) => lesson.riderId === riderId && lesson.date >= start && lesson.date <= end &&
+      (lesson.status === 'CONFIRMED' || lesson.status === 'COMPLETED'));
+  }
   async lesson(entityId: string) { return store.lessons.find((item) => item.id === entityId); }
   async createLesson(input: LessonInput) { const entity: Lesson = { ...input, id: id('lesson'), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; store.lessons.push(entity); return entity; }
   async updateLesson(entityId: string, input: LessonInput) { const index = store.lessons.findIndex((item) => item.id === entityId); if (index < 0) return undefined; store.lessons[index] = { ...store.lessons[index], ...input, updatedAt: new Date().toISOString() }; return store.lessons[index]; }
@@ -109,6 +114,11 @@ export class PostgresDatabase implements SchedulerDatabase {
   }
   async updateCoach(entityId: string, input: CoachInput) { try { return toCoach(await this.prisma.coach.update({ where: { id: entityId }, data: { ...input, notes: nullableText(input.notes) } })); } catch (error) { if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') return undefined; throw error; } }
   async lessons(date?: string) { return (await this.prisma.lesson.findMany({ where: date ? { date: new Date(`${date}T00:00:00.000Z`) } : undefined, orderBy: [{ date: 'asc' }, { startTime: 'asc' }] })).map(toLesson); }
+  async riderHistory(riderId: string, start: string, end: string) {
+    return (await this.prisma.lesson.findMany({ where: {
+      riderId, date: { gte: new Date(start), lte: new Date(end) }, status: { in: ['CONFIRMED', 'COMPLETED'] },
+    } })).map(toLesson);
+  }
   async lesson(entityId: string) { const entity = await this.prisma.lesson.findUnique({ where: { id: entityId } }); return entity ? toLesson(entity) : undefined; }
   async createLesson(input: LessonInput) { return toLesson(await this.prisma.lesson.create({ data: { ...input, date: new Date(`${input.date}T00:00:00.000Z`), notes: nullableText(input.notes) } })); }
   async updateLesson(entityId: string, input: LessonInput) { try { return toLesson(await this.prisma.lesson.update({ where: { id: entityId }, data: { ...input, date: new Date(`${input.date}T00:00:00.000Z`), notes: nullableText(input.notes) } })); } catch (error) { if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') return undefined; throw error; } }

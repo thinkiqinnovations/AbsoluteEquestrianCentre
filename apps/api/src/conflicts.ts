@@ -5,12 +5,19 @@ import { overlaps } from './intervals.js';
 type Context = { horses: Horse[]; riders: Rider[]; coaches: Coach[]; lessons: Lesson[] };
 const active = (lesson: Lesson) => lesson.status !== 'CANCELLED';
 
-export function findConflicts(candidate: LessonInput, context: Context, ignoredLessonId?: string): Conflict[] {
+export function horseWorkload(horse: Horse, candidate: LessonInput, lessons: Lesson[], ignoredLessonId?: string) {
+  const current = lessons.filter((lesson) => lesson.date === candidate.date && lesson.horseId === horse.id &&
+    lesson.id !== ignoredLessonId && active(lesson)).reduce((sum, lesson) => sum + lesson.rideUnits, 0);
+  return { current, proposed: candidate.rideUnits, projected: current + candidate.rideUnits, maximum: horse.maximumDailyRideUnits };
+}
+
+export function findConflicts(candidate: LessonInput, context: Context, ignoredLessonId?: string, allowUnselectedCoach = false): Conflict[] {
   const horse = context.horses.find((item) => item.id === candidate.horseId);
   const rider = context.riders.find((item) => item.id === candidate.riderId);
   const coach = context.coaches.find((item) => item.id === candidate.coachId);
   const conflicts: Conflict[] = [];
-  if (!horse || !rider || (!coach && (candidate.coachId || candidate.lessonType !== 'PART_BOARD_RIDE'))) return [{ code: 'REFERENCE_NOT_FOUND', severity: 'ERROR', message: 'Rider, horse, or coach was not found.' }];
+  if (!horse || !rider || (!coach && (candidate.coachId || (!allowUnselectedCoach && candidate.lessonType !== 'PART_BOARD_RIDE')))) return [{ code: 'REFERENCE_NOT_FOUND', severity: 'ERROR', message: 'Rider, horse, or coach was not found.' }];
+  if (!horse.active) conflicts.push({ code: 'HORSE_INACTIVE', severity: 'ERROR', message: `${horse.name} is inactive.` });
   const sameDay = context.lessons.filter((lesson) => lesson.id !== ignoredLessonId && lesson.date === candidate.date && active(lesson));
   const doubleBooked = (field: 'horseId' | 'riderId', code: string, subject: string) => {
     if (sameDay.some((lesson) => lesson[field] === candidate[field] && overlaps(candidate, lesson))) conflicts.push({ code, severity: 'ERROR', message: `${subject} is already assigned during this time.` });
@@ -31,7 +38,8 @@ export function findConflicts(candidate: LessonInput, context: Context, ignoredL
   const level = candidate.discipline === 'JUMP' ? rider.jumpLevel : rider.flatLevel;
   if (RIDER_LEVEL_RANK[level] < RIDER_LEVEL_RANK[horse.minimumRiderLevel] || RIDER_LEVEL_RANK[level] > RIDER_LEVEL_RANK[horse.maximumRiderLevel]) conflicts.push({ code: 'RIDER_LEVEL_INCOMPATIBLE', severity: 'ERROR', message: `${rider.firstName}'s ${candidate.discipline.toLowerCase()} level is outside ${horse.name}'s supported rider level range.` });
   if (candidate.discipline === 'JUMP' && !horse.supportsJumping) conflicts.push({ code: 'HORSE_NOT_JUMP_CAPABLE', severity: 'ERROR', message: `${horse.name} does not support jumping.` });
-  const total = sameDay.filter((lesson) => lesson.horseId === horse.id).reduce((sum, lesson) => sum + lesson.rideUnits, candidate.rideUnits);
+  if (candidate.discipline === 'FLAT' && !horse.supportsFlat) conflicts.push({ code: 'FLAT_NOT_SUPPORTED', severity: 'ERROR', message: `${horse.name} does not support flat lessons.` });
+  const total = horseWorkload(horse, candidate, sameDay).projected;
   const ratio = total / horse.maximumDailyRideUnits;
   if (ratio > WORKLOAD_THRESHOLDS.warning) conflicts.push({ code: 'HORSE_WORKLOAD_EXCEEDED', severity: 'ERROR', message: `${horse.name} would exceed its daily workload limit (${total} / ${horse.maximumDailyRideUnits} units).` });
   else if (ratio >= WORKLOAD_THRESHOLDS.normal) conflicts.push({ code: 'HORSE_WORKLOAD_WARNING', severity: 'WARNING', message: `${horse.name} is approaching today's workload limit (${total} / ${horse.maximumDailyRideUnits} units).` });
