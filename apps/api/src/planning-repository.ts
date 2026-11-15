@@ -1,15 +1,13 @@
-import { civilDate, dateValue, barnToday, addDays, weekday, schedulingPriority, type Agreement, type LessonInput } from '@absolute/shared';
+import { civilDate, dateValue, addDays, weekday, schedulingPriority, type Agreement, type LessonInput } from '@absolute/shared';
 import type { Prisma } from '@prisma/client';
 import { database, PostgresDatabase, prisma, toLesson } from './database.js';
-import { id, store } from './store.js';
-import { appTimeZone } from './time-zone.js';
+import { demoTimestamp, demoToday as today, id, store } from './store.js';
 import type { Usage } from './part-board.js';
 import type { Template } from './recurring.js';
 import type { Lesson } from './types.js';
 import { availabilityRecords } from './availability-store.js';
 
-const today = barnToday(appTimeZone);
-const demoAgreements: Agreement[] = [
+export const demoAgreements: Agreement[] = [
   { id: 'part-board-emma', riderId: 'rider-emma', horseId: 'horse-jasper', status: 'ACTIVE', startDate: addDays(today, -30),
     endDate: null, priority: 100, freeRidesPerPeriod: 2, entitlementPeriod: 'WEEK',
     preferredRideTimes: [{ dayOfWeek: 'TUESDAY', startTime: '17:00', endTime: '19:00', preferenceRank: 1 },
@@ -26,9 +24,9 @@ const demoAgreements: Agreement[] = [
   { id: 'part-board-history', riderId: 'rider-emma', horseId: 'horse-charlie', status: 'ENDED', startDate: addDays(today, -90),
     endDate: addDays(today, -45), priority: 100, freeRidesPerPeriod: 2, entitlementPeriod: 'WEEK', preferredRideTimes: [] },
 ];
-const demoUsage: Usage[] = [];
+export const demoUsage: Usage[] = [];
 const nextDay = addDays(today, 1);
-const demoTemplates: Template[] = [
+export const demoTemplates: Template[] = [
   { id: 'recurring-demo-lesson', startDate: nextDay, endDate: null, status: 'ACTIVE', dayOfWeek: weekday(nextDay),
     schedulingPriority: schedulingPriority.recurringLesson,
     lesson: { date: nextDay, startTime: '12:00', endTime: '12:45', riderId: 'rider-olivia', horseId: 'horse-atlas',
@@ -39,22 +37,22 @@ const demoTemplates: Template[] = [
       coachId: null, lessonType: 'PART_BOARD_RIDE', discipline: 'FLAT', rideUnits: 1, status: 'CONFIRMED', consumeEntitlement: true } },
 ];
 
-if (!prisma) {
+export const demoPartBoardLessons: Lesson[] = [];
+{
   // Seed short completed rides so the current weekly entitlement and workload are visible.
   for (const [index, startTime, endTime] of [[1, '08:00', '08:20'], [2, '08:20', '08:40']] as const) {
     const lessonId = `part-board-demo-${index}`;
-    const timestamp = new Date().toISOString();
-    store.lessons.push({ ...store.lessons[0], id: lessonId, date: today, startTime, endTime, coachId: null,
+    demoPartBoardLessons.push({ ...store.lessons[0], id: lessonId, date: today, startTime, endTime, coachId: null,
       lessonType: 'PART_BOARD_RIDE', rideUnits: 0.25, status: 'COMPLETED', consumeEntitlement: true,
-      partBoardAgreementId: 'part-board-emma', createdAt: timestamp, updatedAt: timestamp });
+      partBoardAgreementId: 'part-board-emma', createdAt: demoTimestamp, updatedAt: demoTimestamp });
     demoUsage.push({ agreementId: 'part-board-emma', lessonId, entitlementDate: today, quantity: 1 });
   }
-  const timestamp = new Date().toISOString();
-  store.lessons.push({ ...store.lessons[2], id: 'part-board-demo-olivia', date: today, startTime: '15:30', endTime: '16:15',
+  demoPartBoardLessons.push({ ...store.lessons[2], id: 'part-board-demo-olivia', date: today, startTime: '15:30', endTime: '16:15',
     coachId: null, lessonType: 'PART_BOARD_RIDE', status: 'CONFIRMED', rideUnits: 0.75, consumeEntitlement: true,
-    partBoardAgreementId: 'part-board-olivia', createdAt: timestamp, updatedAt: timestamp });
+    partBoardAgreementId: 'part-board-olivia', createdAt: demoTimestamp, updatedAt: demoTimestamp });
   demoUsage.push({ agreementId: 'part-board-olivia', lessonId: 'part-board-demo-olivia', entitlementDate: today, quantity: 1 });
 }
+if (!prisma) store.lessons.push(...demoPartBoardLessons);
 
 export class PlanningRepository {
   readonly scheduler;

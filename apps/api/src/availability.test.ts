@@ -116,7 +116,7 @@ it('validates availability CRUD, lesson edits, and Monday-start schedules', asyn
   expect(check.body.RIDER[resource.resourceId].status).toBe('UNAVAILABLE');
   const week = await api.get('/api/schedule/week').query({ start: '2026-11-23' }).expect(200);
   expect(week.body.week.end).toBe('2026-11-29');
-  expect(week.body.lessons).toContainEqual(expect.objectContaining({ id: created.body.lesson.id, horse: expect.objectContaining({ name: 'Jasper' }) }));
+  expect(week.body.lessons).toContainEqual(expect.objectContaining({ id: created.body.lesson.id, horse: expect.objectContaining({ name: 'Sassy' }) }));
   await api.get('/api/schedule/week').query({ start: date }).expect(400);
   await api.delete(`/api/availability/overrides/${override.body.id}`).expect(204);
   await api.delete(`/api/availability/rules/${rule.body.id}`).expect(204);

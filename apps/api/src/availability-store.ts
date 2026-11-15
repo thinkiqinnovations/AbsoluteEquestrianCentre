@@ -1,8 +1,7 @@
-import { addDays, barnToday, civilDate, dateValue, weekdays, overrideReasons, type AvailabilityOverride, type AvailabilityRule, type OverrideInput, type Resource, type RuleInput } from '@absolute/shared';
+import { addDays, civilDate, dateValue, weekdays, overrideReasons, type AvailabilityOverride, type AvailabilityRule, type OverrideInput, type Resource, type RuleInput } from '@absolute/shared';
 import { prisma } from './database.js';
 import type { Prisma } from '@prisma/client';
-import { id, memoryAvailabilityRules } from './store.js';
-import { appTimeZone } from './time-zone.js';
+import { demoTimestamp, demoToday, id, memoryAvailabilityRules } from './store.js';
 
 type Input = RuleInput | OverrideInput;
 type Metadata = { id: string; createdAt: string; updatedAt: string };
@@ -36,20 +35,19 @@ function memory<T extends Input>(items: (T & Metadata)[]): Repository<T> {
 
 const timestamps = ({ id, createdAt, updatedAt }: { id: string; createdAt: Date; updatedAt: Date }) =>
   ({ id, createdAt: createdAt.toISOString(), updatedAt: updatedAt.toISOString() });
-const seedTime = '2026-11-14T00:00:00.000Z';
-const seedMetadata = (seedId: string) => ({ id: seedId, createdAt: seedTime, updatedAt: seedTime });
+const seedMetadata = (seedId: string) => ({ id: seedId, createdAt: demoTimestamp, updatedAt: demoTimestamp });
 const sampleResources: Resource[] = [
   { resourceType: 'HORSE', resourceId: 'horse-jasper' },
   { resourceType: 'HORSE', resourceId: 'horse-willow' },
   { resourceType: 'COACH', resourceId: 'coach-james' },
   { resourceType: 'RIDER', resourceId: 'rider-noah' },
 ];
-const sampleRules = sampleResources.flatMap((resource) => weekdays.map((dayOfWeek): AvailabilityRule => ({
+export const sampleRules = sampleResources.flatMap((resource) => weekdays.map((dayOfWeek): AvailabilityRule => ({
   ...resource, ...seedMetadata(`rule-${resource.resourceId}-${dayOfWeek}`), dayOfWeek,
   startTime: '08:00', endTime: '20:00', availabilityType: 'AVAILABLE',
 })));
-const sampleOverrides: AvailabilityOverride[] = sampleResources.map((resource, index) => ({
-  ...resource, ...seedMetadata(`override-${resource.resourceId}`), date: addDays(barnToday(appTimeZone), index + 1),
+export const sampleOverrides: AvailabilityOverride[] = sampleResources.map((resource, index) => ({
+  ...resource, ...seedMetadata(`override-${resource.resourceId}`), date: addDays(demoToday, index + 1),
   startTime: '17:00', endTime: '19:00', availabilityType: 'UNAVAILABLE',
   reason: (['REST', 'VET', 'PERSONAL', 'SCHOOL_EVENT'] as const)[index],
 }));

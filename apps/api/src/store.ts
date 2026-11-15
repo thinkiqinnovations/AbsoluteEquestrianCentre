@@ -1,19 +1,22 @@
 import type { Coach, Horse, Lesson, Rider } from './types.js';
-import { barnToday, monday, monthRange, weekDates, type AvailabilityRule } from '@absolute/shared';
+import { addDays, barnToday, monday, monthRange, shiftMonth, weekDates, type AvailabilityRule } from '@absolute/shared';
 import { appTimeZone } from './time-zone.js';
 
-const now = () => new Date().toISOString();
-const make = <T extends object>(id: string, input: T) => ({ ...input, id, createdAt: now(), updatedAt: now() });
-const today = barnToday(appTimeZone);
+export const demoToday = barnToday(appTimeZone);
+export const demoTimestamp = `${demoToday}T00:00:00.000Z`;
+const make = <T extends object>(id: string, input: T) => ({ ...input, id, createdAt: demoTimestamp, updatedAt: demoTimestamp });
+const today = demoToday;
 export const memoryAvailabilityRules: AvailabilityRule[] = [];
 
-const currentWeek = weekDates(monday(today));
-const currentMonth = monthRange(Number(today.slice(0, 4)), Number(today.slice(5, 7)));
-const demoDates = new Set([...currentWeek, ...currentMonth.dates.filter((_, index) => index % 2 === 0)]);
+const demoDates = new Set([...weekDates(monday(today)), ...weekDates(addDays(monday(today), 7))]);
+for (const month of [today, shiftMonth(today, 1)]) {
+  const { dates } = monthRange(Number(month.slice(0, 4)), Number(month.slice(5, 7)));
+  for (const date of dates.filter((date) => !demoDates.has(date)).filter((_, index) => index % 3 === 0).slice(0, 4)) demoDates.add(date);
+}
 demoDates.delete(today);
 
 const demoLessons = [...demoDates].sort().map((date, index): Lesson =>
-  make(`lesson-demo-${date}`, {
+  make(`lesson-demo-${index + 1}`, {
     date,
     startTime: index % 2 === 0 ? '10:30' : '14:00',
     endTime: index % 2 === 0 ? '11:15' : '14:45',
@@ -22,16 +25,16 @@ const demoLessons = [...demoDates].sort().map((date, index): Lesson =>
     coachId: 'coach-james',
     lessonType: 'PRIVATE',
     discipline: 'FLAT',
-    rideUnits: 0.75,
+    rideUnits: index % 3 === 0 ? 1.25 : 0.75,
     status: 'CONFIRMED',
     notes: 'Sample calendar lesson',
   }));
 
 export const store: { horses: Horse[]; riders: Rider[]; coaches: Coach[]; lessons: Lesson[] } = {
   horses: [
-    make('horse-jasper', { name: 'Jasper', active: true, description: 'Steady schoolmaster', walkCapable: true, trotCapable: true, canterCapable: true, supportsFlat: true, supportsJumping: true, minimumRiderLevel: 'BEGINNER', maximumRiderLevel: 'INTERMEDIATE', maximumDailyRideUnits: 1.5, notes: '' }),
+    make('horse-jasper', { name: 'Sassy', active: true, description: 'Steady schoolmaster', walkCapable: true, trotCapable: true, canterCapable: true, supportsFlat: true, supportsJumping: true, minimumRiderLevel: 'BEGINNER', maximumRiderLevel: 'INTERMEDIATE', maximumDailyRideUnits: 1.5, notes: '' }),
     make('horse-willow', { name: 'Willow', active: true, description: 'Responsive all-rounder', walkCapable: true, trotCapable: true, canterCapable: true, supportsFlat: true, supportsJumping: true, minimumRiderLevel: 'INTERMEDIATE', maximumRiderLevel: 'ADVANCED', maximumDailyRideUnits: 1.5, notes: '' }),
-    make('horse-charlie', { name: 'Charlie', active: true, description: 'Patient flat partner', walkCapable: true, trotCapable: true, canterCapable: false, supportsFlat: true, supportsJumping: false, minimumRiderLevel: 'BEGINNER', maximumRiderLevel: 'INTERMEDIATE', maximumDailyRideUnits: 1.5, notes: '' }),
+    make('horse-charlie', { name: 'Lindon', active: true, description: 'Patient flat partner', walkCapable: true, trotCapable: true, canterCapable: false, supportsFlat: true, supportsJumping: false, minimumRiderLevel: 'BEGINNER', maximumRiderLevel: 'INTERMEDIATE', maximumDailyRideUnits: 1.5, notes: '' }),
     make('horse-atlas', { name: 'Atlas', active: true, description: 'Advanced jumping horse', walkCapable: true, trotCapable: true, canterCapable: true, supportsFlat: true, supportsJumping: true, minimumRiderLevel: 'ADVANCED', maximumRiderLevel: 'ADVANCED', maximumDailyRideUnits: 1.75, notes: '' }),
   ],
   riders: [

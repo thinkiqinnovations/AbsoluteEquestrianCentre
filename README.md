@@ -71,6 +71,51 @@ pnpm typecheck
 pnpm test
 ```
 
+## Demo Data
+
+All demo data is fictional. The same core fixtures provide demo names, schedules, availability, and part-board records for seeded-memory mode and the PostgreSQL seed in `prisma/seed.ts`. PostgreSQL also starts with persisted examples of both kinds of recurring occurrence. Billing stays disabled.
+
+The fixtures use the current barn-local date in `APP_TIME_ZONE` (default `America/Toronto`). The seed fills today, every day of the current and next weeks, and extra dates in the current and following months. Stable fixture IDs allow reseeding to refresh demo dates and values without inserting a duplicate set.
+
+The dataset includes:
+
+- Four horses, three riders, two coaches, and ranked horse preferences. Flat and Jump lessons show light workload, near capacity, and at-capacity horses.
+- Recurring availability for all three resource types, plus dated exceptions. Some resources demonstrate unconfigured availability.
+- Active and ended part-board agreements, ranked ride preferences, and available, partially used, and exhausted entitlements.
+- Regular and part-board recurring templates with persisted occurrences. Select **Generate lessons** for Emma's recurring ride to see a failed occurrence caused by Sassy's rest override.
+
+### Populate or refresh a PostgreSQL demo
+
+Create an empty disposable development database. In PowerShell, replace the example connection string with your local credentials. Set the variables in the same terminal used to run the commands.
+
+```powershell
+$env:DATABASE_URL = 'postgresql://postgres:YOUR_LOCAL_PASSWORD@localhost:5432/aec_demo'
+$env:DIRECT_URL = $env:DATABASE_URL
+$env:APP_TIME_ZONE = 'America/Toronto'
+$env:BILLING_ENABLED = 'false'
+$env:DEMO_SEED = '1'
+pnpm install
+pnpm prisma:generate
+pnpm prisma:migrate:deploy
+pnpm db:seed
+pnpm build
+pnpm start
+```
+
+Open [the local scheduler](http://localhost:3001/). Use another port via the `PORT` environment variable if 3001 is in use. To refresh the demo, stop the app and run `pnpm db:seed` again with the same environment, then start the app. Reseeding updates fixture records and leaves bookings you added through the app in place.
+
+### Reset the disposable demo database
+
+The following command clears all records in the configured database. Use it only with your disposable development database. Stop the app before resetting.
+
+```powershell
+pnpm exec prisma migrate reset --force --skip-seed --schema prisma/schema.prisma
+pnpm db:seed
+pnpm start
+```
+
+Without `DATABASE_URL`, the local app uses recurring, date-aware seeded-memory fixtures and resets them on restart.
+
 ## Database and deployment
 
 The production deployment is one Render Node.js web service, using Supabase PostgreSQL:
