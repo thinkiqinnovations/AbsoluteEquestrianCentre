@@ -4,7 +4,7 @@ Absolute Equestrian Scheduler is a TypeScript monorepo for managing school horse
 
 ## Development Status
 
-**Iteration 4 adds explainable horse recommendations to Add/Edit Lesson.** Day, Week, and Month scheduling, availability, shared-coach bookings, part boarding, recurring lessons, and manual payment-status records remain available.
+**Iteration 4 is complete.** It includes explainable horse recommendations in Add/Edit Lesson, plus Day, Week, and Month scheduling, availability, shared-coach bookings, part boarding, recurring lessons, and manual payment-status records.
 
 Implemented through Iteration 4:
 
@@ -71,6 +71,11 @@ pnpm lint
 pnpm typecheck
 pnpm test
 ```
+
+## User documentation
+
+- [User Guide](docs/USER_GUIDE.md) — day-to-day staff workflow and feature guidance.
+- [Light Test Cases](docs/TEST_CASES.md) — Iteration 4 manual smoke tests and release checks.
 
 ## Demo Data
 
