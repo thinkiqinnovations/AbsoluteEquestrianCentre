@@ -4,6 +4,7 @@ import { addDays, monday, weekdays } from '@absolute/shared';
 import { api } from './api';
 import { formatDate, formatTime, scheduleKeys } from './scheduling';
 import { matchesFilters, ScheduleFilters, type CalendarLesson, type Filters } from './ScheduleFilters';
+import { ServiceActivities } from './ServiceActivities';
 
 const lessonPreviewLimit = 3;
 const gridColumns = 'repeat(7, minmax(0, 1fr))';
@@ -66,6 +67,7 @@ export function MonthlyCalendar({ date, filters, onFilter, onDay, onEdit }: {
       {day.errors > 0 && <Button size="small" color="error" onClick={() => onDay(day.date)}>Conflicts · {day.errors}</Button>}
       {day.availability > 0 && <Button size="small" color="warning" onClick={() => onDay(day.date)}>Availability · {day.availability}</Button>}
       {day.workload > 0 && <Button size="small" color="warning" onClick={() => onDay(day.date)}>Near capacity · {day.workload}</Button>}
+      <ServiceActivities start={start} end={end} date={day.date} filters={filters} />
       {day.lessons.length === 0 && !mobile && <Box onClick={() => onDay(day.date)} sx={{ cursor: 'pointer', flexGrow: 1 }} />}
     </Stack>;
   }

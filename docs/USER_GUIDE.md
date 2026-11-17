@@ -19,7 +19,7 @@ The calendar uses the barn's configured local time zone. Lessons use a start and
 
 ### Day
 
-Day view is the main operational view. It shows the day's lessons, each scheduled horse's workload, and any scheduling attention items.
+Day view is the main operational view. It shows the day's lessons grouped by coach and then by matching start and end times, each scheduled horse's workload, and any scheduling attention items. Coaches appear alphabetically, with riding times in chronological order. Coach-less bookings appear under Self ride.
 
 - Select **+ Add Lesson** to create a booking.
 - Select an existing lesson to edit it.
@@ -28,7 +28,7 @@ Day view is the main operational view. It shows the day's lessons, each schedule
 
 ### Week
 
-Week view is useful for short-term planning. Select an empty time slot to start a lesson at that date and time, or select a lesson to edit it. The view expands when a lesson falls outside the usual daytime range.
+Week view is useful for short-term planning. Select an empty time slot to start a lesson at that date and time, or select a lesson to edit it. The view expands when a lesson falls outside the usual daytime range. On phones and smaller tablets, a scrollable agenda lists all seven days with lessons ordered by riding time. Select a lesson to edit it, or use a day's Add lesson button to create a booking.
 
 ### Month
 
@@ -37,9 +37,9 @@ Month view shows lesson counts and compact daily indicators. Select a date, less
 ## Create or edit a lesson
 
 1. Select **+ Add Lesson**, an empty Week slot, or an existing lesson.
-2. Enter the date, start and end time, rider, lesson type, discipline, horse, coach (when applicable), ride units, status, and optional notes.
-3. Review the horse recommendation cards. They explain why a horse is suitable or needs attention; they do not reserve the horse.
-4. Select a horse and save.
+2. Select the activity type, date, time, coach, and optional location. Add every participating rider. For mounted activities select discipline, ride units, and a horse for each rider.
+3. Review each rider's eligible packages and current monthly usage. Choose the entitlement source or individual purchase. Published prices include HST. An exhausted entitlement requires an override reason.
+4. Review the horse recommendation cards, then save the activity. All participants are saved together. Existing unassigned lessons open the legacy edit form.
 
 The server is the final authority. It prevents invalid bookings such as a horse, rider, or coach being booked twice at overlapping times; a horse going over daily workload; an incompatible rider/horse pairing; or a jump lesson on a non-jumping horse.
 
@@ -51,7 +51,7 @@ Warnings request attention, for example an availability period that has not been
 
 ### Shared lessons
 
-For a semi-private or group session, create one lesson for each rider/horse combination using the same coach, date, time, discipline, and lesson type. The application allows the matching shared-coach session while still checking each rider and horse individually.
+For a new shared session, add all riders and their assigned horses in one activity. Semi-private requires exactly two riders for 30 minutes. Group requires three to six riders for 60 minutes. The application checks every rider and horse individually and saves the whole session atomically.
 
 ## Manage horses, riders, and coaches
 
@@ -68,7 +68,7 @@ Ride units measure workload, not lesson count. For example, a 0.5-unit ride plus
 
 ### Riders
 
-Open **Riders** to add, view, or edit riders. Set the overall, Flat, and Jump levels independently where needed. Maintain preferred horses in rank order; recommendations use these ranks as one input.
+Open **Riders** to add, view, or edit riders. Set the overall, Flat, and Jump levels independently where needed. Maintain preferred horses in rank order; recommendations use these ranks as one input. Use **Plans & Entitlements** to enroll in a lesson package, edit enrollment dates/status, and review monthly usage. Part-board package enrollments are managed through their agreement.
 
 ### Coaches
 
@@ -87,10 +87,12 @@ An override takes precedence over a recurring rule. A resource with recurring ru
 
 Open **Part Board** to manage rider–horse agreements, preferred ride times, and free-ride entitlements.
 
+Select a Part Board package when creating or editing an agreement to establish its matching enrollment and monthly allowances. Existing unassigned agreements retain their legacy free-ride configuration.
+
 - An agreement can be active, paused, ended, or cancelled.
 - Free rides are scheduling entitlements, not payments.
 - A part-board self-ride can be coach-less, but it still follows availability, compatibility, double-booking, and workload rules.
-- An exhausted entitlement blocks a ride only when **consume entitlement** is selected. Staff may record a ride without using an entitlement when appropriate.
+- New package-backed practice rides consume the selected monthly practice entitlement. Staff must provide a reason to override an exhausted package. Legacy unassigned rides retain their existing optional **consume entitlement** behavior.
 
 ## Recurring lessons
 
@@ -101,6 +103,14 @@ Changing, pausing, or ending a template affects future generation; previously ge
 ## Manual payment status
 
 Lesson and rider screens can record **Paid**, **Unpaid**, or **Unrecorded** as a manual operational note. These statuses do not collect money, create invoices, change bookings, or change free-ride entitlement use.
+
+## Plans, services, and cancellations
+
+Open **Plans & Pricing** to view published prices, package quantities, effective dates, and payment rules. All supplied prices include HST. Prices are operational classifications and saving an activity does not charge a rider.
+
+Assessments last 30 minutes. Grooming & Tacking lasts 90 minutes and displays **Cash only - exact change please.** Birthday parties reserve two hours and include up to six riders for the configured base price, with the configured additional price for each extra rider. Camps can reserve up to seven consecutive dates with a daily time window, riders, capacity, and status. Party horse allocation and detailed camp administration remain future work.
+
+To cancel a package activity, edit it and set its status to **CANCELLED**. Select **Restore package entitlements for this cancellation** only when staff have approved restoring the allowance. Keeping that box clear retains the consumption. Completed activity records retain their history.
 
 ## Daily operating checklist
 

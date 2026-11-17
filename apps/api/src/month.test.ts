@@ -3,7 +3,7 @@ import request from 'supertest';
 import { afterEach, expect, it, vi } from 'vitest';
 
 it('seeds lessons beyond the current week in the barn month', async () => {
-  vi.stubEnv('DATABASE_URL', undefined);
+  vi.stubEnv('DATABASE_URL', '');
   vi.stubEnv('BILLING_ENABLED', 'false');
   const { appTimeZone } = await import('./time-zone.js');
   const { app } = await import('./app.js');
@@ -27,7 +27,7 @@ it('uses the Toronto calendar month across UTC midnight', () => {
 });
 
 it('groups month lessons, conflicts and workload by date and returns empty dates', async () => {
-  vi.stubEnv('DATABASE_URL', undefined);
+  vi.stubEnv('DATABASE_URL', '');
   vi.stubEnv('BILLING_ENABLED', 'false');
   const { app } = await import('./app.js');
   const { store } = await import('./store.js');

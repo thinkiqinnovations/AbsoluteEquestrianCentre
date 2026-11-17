@@ -8,6 +8,7 @@ import { formatTime, useBarnTimeZone } from './scheduling';
 import { RecurringLessons } from './RecurringLessons';
 import { ChoiceField, readable, usePlanningResources } from './planning-controls';
 import { errorMessage, validationMessage } from './save-errors';
+import { PlanTerms, usePlans, useEnrollments } from './PlansPricing';
 
 export function useAgreements(date?: string, riderId?: string, enabled = true) {
   const query = new URLSearchParams();
@@ -16,12 +17,19 @@ export function useAgreements(date?: string, riderId?: string, enabled = true) {
   return useQuery({ queryKey: ['part-board', date, riderId], queryFn: () => api<AgreementDetails[]>(`/api/part-board?${query}`), enabled });
 }
 
-export function AgreementTerms({ agreement }: { agreement: AgreementDetails }) {
+export function AgreementTerms({ agreement, showPrice = true }: { agreement: AgreementDetails; showPrice?: boolean }) {
   const { entitlement, preferredRideTimes } = agreement;
+  const plans = usePlans();
+  const plan = plans.data?.find(({ id }) => id === agreement.planId);
+  const packageBalances = useEnrollments(barnToday(useBarnTimeZone()), agreement.riderId);
+  const enrollment = packageBalances.data?.find((entry) => entry.agreementId === agreement.id && entry.planId === agreement.planId && entry.status !== 'ENDED');
   return <Stack gap={0.5}>
+    {plan && <PlanTerms plan={plan} showPrice={showPrice} />}
     <Typography variant="body2">{readable(agreement.status)} · {agreement.startDate} to {agreement.endDate ?? 'ongoing'}</Typography>
-    <Typography variant="body2">{entitlement.allowed} rides per {entitlement.period.toLowerCase()} · {entitlement.used} used · {entitlement.remaining} remaining</Typography>
-    <Typography variant="caption">{entitlement.periodStart} to {entitlement.periodEnd}</Typography>
+    {plan ? enrollment?.entitlements.map((entry) => <Typography variant="body2" key={entry.id}>{entry.name} · {entry.used} / {entry.allocated} used · {entry.remaining} remaining · {entry.periodStart} to {entry.periodEnd}</Typography>) : <>
+      <Typography variant="body2">{entitlement.allowed} rides per {entitlement.period.toLowerCase()} · {entitlement.used} used · {entitlement.remaining} remaining</Typography>
+      <Typography variant="caption">{entitlement.periodStart} to {entitlement.periodEnd}</Typography>
+    </>}
     {preferredRideTimes.length > 0 && <Typography variant="body2">Preferred times</Typography>}
     {[...preferredRideTimes].sort((a, b) => a.preferenceRank - b.preferenceRank).map((window) =>
       <Typography key={window.preferenceRank} variant="caption">{window.preferenceRank}. {readable(window.dayOfWeek)} {formatTime(window.startTime)}–{formatTime(window.endTime)}</Typography>)}
@@ -34,7 +42,7 @@ export function ProfileAgreements({ agreements, type }: { agreements: AgreementD
     {!agreements.length && <Typography variant="body2" color="text.secondary">No agreements.</Typography>}
     {agreements.map((agreement) => <Stack key={agreement.id} alignItems="flex-start">
       <Typography fontWeight={700}>{type === 'horses' ? agreement.riderName : agreement.horseName}</Typography>
-      <AgreementTerms agreement={agreement} />
+      <AgreementTerms agreement={agreement} showPrice={type === 'riders'} />
       <Button size="small" component={Link} to={`/part-board?agreement=${agreement.id}`}>View agreement</Button>
     </Stack>)}
   </Stack>;
@@ -59,6 +67,7 @@ export function PartBoard() {
     onSuccess: () => {
       setDraft(undefined);
       void client.invalidateQueries({ queryKey: ['part-board'] });
+      void client.invalidateQueries({ queryKey: ['enrollments'] });
     },
   });
   const edit = (entry: Partial<AgreementDetails>) => { mutation.reset(); setDraft(entry); };
@@ -108,7 +117,10 @@ function AgreementDialog({ draft, date, resources, saving, error, onClose, onSav
     riderId: draft.riderId ?? '', horseId: draft.horseId ?? '', status: draft.status ?? 'ACTIVE', startDate: draft.startDate ?? date,
     endDate: draft.endDate ?? null, priority: draft.priority ?? 100, freeRidesPerPeriod: draft.freeRidesPerPeriod ?? 0,
     entitlementPeriod: draft.entitlementPeriod ?? 'WEEK', notes: draft.notes ?? '', preferredRideTimes: draft.preferredRideTimes ?? [],
+    planId: draft.planId ?? null,
   });
+  const plans = usePlans();
+  const selectedPlan = plans.data?.find(({ id }) => id === form.planId);
   const set = <K extends keyof AgreementInput>(key: K, value: AgreementInput[K]) => setForm((current) => ({ ...current, [key]: value }));
   const valid = agreementSchema.safeParse(form);
   const [submitted, setSubmitted] = useState(false);
@@ -118,11 +130,13 @@ function AgreementDialog({ draft, date, resources, saving, error, onClose, onSav
       {error && <Alert severity="error" sx={{ whiteSpace: 'pre-line' }}>{error}</Alert>}
       <ChoiceField label="Rider" value={form.riderId} options={resources.riders} onChange={(value) => set('riderId', value)} />
       <ChoiceField label="Horse" value={form.horseId} options={resources.horses} onChange={(value) => set('horseId', value)} />
+      <ChoiceField label="Part Board package" value={form.planId ?? ''} emptyLabel="Legacy / unassigned" options={plans.data?.filter((plan) => plan.category === 'PART_BOARD' && (plan.active || plan.id === form.planId)).map((plan) => ({ id: plan.id, label: plan.name })) ?? []} onChange={(value) => set('planId', value || null)} />
+      {selectedPlan && <PlanTerms plan={selectedPlan} />}
       <ChoiceField label="Status" value={form.status} options={agreementStatuses.map((id) => ({ id, label: readable(id) }))} onChange={(value) => set('status', value as AgreementInput['status'])} />
       <TextField type="date" label="Start date" value={form.startDate} onChange={(event) => set('startDate', event.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
       <TextField type="date" label="End date" value={form.endDate ?? ''} onChange={(event) => set('endDate', event.target.value || null)} slotProps={{ inputLabel: { shrink: true } }} />
-      <TextField type="number" label="Free rides per period" value={form.freeRidesPerPeriod} onChange={(event) => set('freeRidesPerPeriod', Number(event.target.value))} />
-      <ChoiceField label="Entitlement period" value={form.entitlementPeriod} options={entitlementPeriods.map((id) => ({ id, label: readable(id) }))} onChange={(value) => set('entitlementPeriod', value as AgreementInput['entitlementPeriod'])} />
+      {!form.planId && <><TextField type="number" label="Free rides per period" value={form.freeRidesPerPeriod} onChange={(event) => set('freeRidesPerPeriod', Number(event.target.value))} />
+      <ChoiceField label="Entitlement period" value={form.entitlementPeriod} options={entitlementPeriods.map((id) => ({ id, label: readable(id) }))} onChange={(value) => set('entitlementPeriod', value as AgreementInput['entitlementPeriod'])} /></>}
       <TextField type="number" label="Priority" value={form.priority} onChange={(event) => set('priority', Number(event.target.value))} />
       <TextField label="Notes" value={form.notes} onChange={(event) => set('notes', event.target.value)} />
       <Typography variant="h6">Preferred ride times</Typography>

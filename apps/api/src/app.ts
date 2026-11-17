@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { validationError } from './validation-error.js';
 import { paymentStatusRouter } from './payment-status-router.js';
+import { plansRouter } from './plans-router.js';
+import { PlanError } from './plans-service.js';
 import { coachWeeklyAvailabilitySchema, horseRecommendationSchema, lessonFields, monthRange } from '@absolute/shared';
 import { evaluateHorseRecommendations } from './horse-recommendations.js';
 import { planningRouter } from './planning-router.js';
@@ -38,6 +40,7 @@ app.get('/api/schedule/settings', (_req, res) => res.json({ timeZone: appTimeZon
 app.use('/api/availability', availabilityRouter);
 app.use('/api/payment-status', paymentStatusRouter);
 app.use('/api', planningRouter);
+app.use('/api', plansRouter);
 app.post('/api/recommendations/horses', async (req, res, next) => {
   const input = parse(horseRecommendationSchema, req.body, res);
   if (!input) return;
@@ -85,6 +88,10 @@ async function saveLesson(req: express.Request, res: express.Response, next: exp
     if (req.method === 'PATCH' && !patch) return;
     const result = await planningWrite(async (repository) => {
       const existing = lessonId ? await repository.scheduler.lesson(lessonId) : undefined;
+      if (lessonId && repository.client && await repository.client.activityParticipant.findUnique({ where: { lessonId }, select: { id: true } })) {
+        throw new PlanError('ACTIVITY_EDIT_REQUIRED', 'Edit this booking through its activity so all participants and package entitlements remain synchronized.');
+      }
+      if (existing?.activityId) throw new PlanError('ACTIVITY_EDIT_REQUIRED', 'Edit the activity to update this booking and its entitlements.');
       if (lessonId && !existing) return null;
       const input = lessonSchema.safeParse(req.method === 'PATCH' ? { ...existing, ...patch } : patch);
       if (!input.success) return { validation: validationError(input.error) };
@@ -180,6 +187,10 @@ app.use('/api', (_req, res) => { notFound(res); });
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   void _next;
+  if (error instanceof PlanError) {
+    res.status(error.status).json({ error: { code: error.code, message: error.message } });
+    return;
+  }
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === 'P2002') {
       res.status(409).json({ error: { code: 'DUPLICATE_RECORD', message: 'This entry duplicates an existing record.' } });

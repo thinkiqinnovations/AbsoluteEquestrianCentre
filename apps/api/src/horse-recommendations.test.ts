@@ -102,7 +102,7 @@ describe('horse recommendation rules', () => {
 });
 
 it('validates the API request, returns versioned rankings, and never reserves a recommended horse', async () => {
-  vi.stubEnv('DATABASE_URL', undefined);
+  vi.stubEnv('DATABASE_URL', '');
   vi.stubEnv('BILLING_ENABLED', 'false');
   const api = request((await import('./app.js')).app);
   const path = '/api/recommendations/horses';

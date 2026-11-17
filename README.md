@@ -4,7 +4,7 @@ Absolute Equestrian Scheduler is a TypeScript monorepo for managing school horse
 
 ## Development Status
 
-**Iteration 4 is complete.** It includes explainable horse recommendations in Add/Edit Lesson, plus Day, Week, and Month scheduling, availability, shared-coach bookings, part boarding, recurring lessons, and manual payment-status records.
+**Iteration 5 adds plans, HST-inclusive pricing, rider enrollments, explicit package entitlement usage, and activity reservations.** Existing scheduling, recommendations, availability, part boarding, recurrence, manual payment status, and recent calendar improvements are preserved. Automated verification is described below. Manual browser verification remains pending because the computer-use tool could not verify the browser URL.
 
 Implemented through Iteration 4:
 
@@ -33,7 +33,7 @@ Authentication, automatic schedule generation, and active billing are deferred.
 - [x] Tests proving billing remains disabled
 - [ ] Billing database models
 - [ ] Billing account management
-- [ ] Price catalogue
+- [x] Operational plans and pricing catalogue
 - [ ] Active billing provider
 - [ ] Checkout
 - [ ] Invoices
@@ -156,7 +156,7 @@ Prisma migrations are stored in `prisma/migrations/`. Apply pending migrations b
 
 ## Scheduling and availability
 
-- To book a shared session, add one lesson per rider and horse with the same coach, date, start and end times, discipline, and lesson type. Choose **Semi-private** for up to two riders or **Group** for a larger session. Each rider and horse still has its own booking, availability checks, and workload rules. Other overlapping sessions with the same coach are rejected.
+- New shared sessions use **Add Lesson / Activity**. Select all riders and their horses together. Semi-private requires exactly two riders for 30 minutes. Group requires three to six riders for 60 minutes. Private requires one rider for 30 minutes. Each rider and horse still has its own booking, availability checks, and workload rules. Legacy unassigned bookings retain their original durations and editing behavior.
 
 - `APP_TIME_ZONE` defaults to `America/Toronto`. The scheduler exchanges barn-local dates (`YYYY-MM-DD`) and wall-clock times (`HH:mm`). The API supplies the configured time zone to the web app. Date navigation and weekly rules use civil calendar arithmetic.
 - Switch between **Day** and **Week** on the Schedule page. The Material UI weekly grid defaults to 8 AM–9 PM and expands for lessons outside those hours. Select a lesson to edit it or select a time slot to open Add Lesson with that date and time filled in.
@@ -170,8 +170,8 @@ Prisma migrations are stored in `prisma/migrations/`. Apply pending migrations b
 
 Day, Week, and Month are projections over the same lessons. Availability, workload, compatibility, double booking, and validation rules remain in the API. The selected date and view can be bookmarked, for example `/schedule?view=month&date=2026-11-14`.
 
-- **Day** shows detailed lessons, horse workload, and scheduling notices. It uses `GET /api/schedule?date=YYYY-MM-DD`.
-- **Week** shows seven days of lesson blocks for short-term resource planning. It uses `GET /api/schedule/week?start=YYYY-MM-DD`.
+- **Day** groups lessons under colored `Coach: Name (ride time)` headings. Each rider row has a `Rider:` label, status above ride units, editing, and manual payment indicators. Scheduling Attention displays unique message/severity pairs. It uses `GET /api/schedule?date=YYYY-MM-DD`.
+- **Week** shows seven days of lesson blocks for short-term resource planning, with a scrollable daily agenda on phones and smaller tablets. It uses `GET /api/schedule/week?start=YYYY-MM-DD`.
 - **Month** shows lesson counts, compact previews, and labelled conflict, availability, and workload indicators. It loads the month from `GET /api/schedule/month?year=YYYY&month=MM`. Select a date or **+N more** to open Day view, or select a lesson to edit it in place. On phones the month appears as a scrollable agenda. Adjacent dates in the desktop grid are muted and link to Day view.
 
 Day, Week, and Month share coach, horse, rider, discipline, and lesson-type filters. Month workload indicators reflect the full daily workload of horses represented by the filtered lessons. Coach-less part-board rides are labelled in all three views.
@@ -316,6 +316,127 @@ A future billing service will validate the reference, resolve the rider's billin
 - Part-board free rides are scheduling entitlements. Usage is recorded independently of billing, and every part-board ride counts toward horse workload.
 - Weekly templates generate persisted lessons through normal validation. Generated bookings retain their original occurrence date for duplicate prevention.
 
-## Next Iteration
+## Iteration 5 plans and activities
 
-Iteration 5 should focus on generating draft schedules from rider requests, availability, workload, recommendations, part-board priority, and recurring commitments. Drafts should explain unresolved requests and require manual approval before publishing.
+An **activity type** describes what happens, such as an assessment, group lesson, or practice ride. A **plan** defines the published offering and its HST-inclusive price. A **rider plan enrollment** links a rider to an effective package. A **plan entitlement** defines an allowed monthly quantity. An **activity booking** is the dated reservation, with explicit participants and financial classification. Mounted participants link to the existing `Lesson` rows so horse workload, availability, recommendations, conflicts, and calendars continue using the same scheduling rules.
+
+The new Prisma models are `Plan`, `PlanEntitlement`, `RiderPlanEnrollment`, `ActivityBooking`, `ActivityParticipant`, and `PlanUsage`. All additions are nullable relationships from existing records. Existing lessons, part-board agreements, historical preferences, manual payment statuses, and recurring templates remain usable as legacy/unassigned records.
+
+### Current price configuration
+
+All prices are CAD and include HST. Integer cents are stored in PostgreSQL. The UI reads prices through the API. No tax is added to the supplied totals.
+
+| Offering | HST-inclusive price | Includes |
+| --- | --- | --- |
+| Monthly Group | $215/month | 4 Group Lessons |
+| Monthly Semi-Private | $215/month | 4 Semi-Private Lessons |
+| Monthly Private | $256/month | 4 Private Lessons |
+| 1 Day Part Board, Group / Semi-Private | $269/month | 4 Group or Semi-Private Lessons in a shared allowance |
+| 1 Day Part Board, Private | $310/month | 4 Private Lessons |
+| 2 Day Part Board, Lessons + Practice Rides | $440/month | 4 Group Lessons and 4 Practice Rides |
+| 2 Day Part Board, Lessons Only | $538/month | 8 Group Lessons |
+| 3 Day Part Board, Lessons + Practice Rides | $645/month | 8 Group Lessons and 4 Practice Rides |
+| 3 Day Part Board, Lessons Only | $807/month | 12 Group Lessons |
+| Half Hour Assessment | $60 | 30 minutes, one rider |
+| Single Lesson | $75 | Private, Semi-Private, or Group format |
+| Grooming & Tacking | $30 | 90 minutes, CASH ONLY |
+| Birthday Party | $430 base | Up to 6 riders, 1 hour lesson and 1 hour barn/party room |
+| Seasonal Camp | $678/week | A service/program reservation |
+
+The **Plans & Pricing** screen is read-only. Administrators can update configuration through the database. Future pricing edits should use effective-dated plan versions when historical package allocations must be preserved. Booked participants keep published-price, applicable-amount, HST, and payment-rule snapshots.
+
+Grooming & Tacking stores `CASH_ONLY` and the instruction **Cash only - exact change please.** as configuration. A database check and backend validation enforce that rule.
+
+Birthday pricing stores the base price, included quantity of six, and additional-unit price of $60. The backend calculates $430 for six, $490 for seven, and $550 for eight, with the additional quantity clamped to zero below six. Party bookings reserve the registered riders, coach, and optional room/location for two hours. Individual horse assignments during a party are outside this iteration's party reservation workflow.
+
+Camps store a start/end date, selected riders, capacity, and reservation status. A reservation covers at most seven consecutive dates, with a daily start/end time and a $678 weekly classification per rider. A one-day camp reservation also uses the weekly price. Staff should confirm this assumption before adopting a separate partial-week price. Camp registration administration, seasonal rosters, and payments remain future work.
+
+### Add Lesson and activity workflow
+
+1. Select an activity type. Lesson formats have separate Group, Semi-Private, and Private choices. Assessments default to 30 minutes, lessons to 60/30/30, practice rides to 60, grooming to 90, parties to 120, and camps to an eight-hour daily window.
+2. Set the date, riding time, coach, and optional arena/location. For mounted activities select discipline, ride units, riders, and a recommended horse for each rider.
+3. Select all participants together. The backend validates private, semi-private, and group capacity and enforces activity duration.
+4. The form finds effective enrollments for each rider and automatically selects an applicable available entitlement. Select another valid entitlement source or individual purchase when appropriate.
+5. Review the monthly allocation, used quantity, and remaining balance. A new booking preview shows the balance before and after one use. Editing a booking retains its original source. If an entitlement is exhausted, staff must enter an override reason to continue.
+6. Save the activity. All participant bookings and consumption records are written atomically under the existing PostgreSQL scheduling lock. Editing uses a version number to reject stale changes. A completed activity keeps its financial/usage history.
+
+Assessments, lessons, and practice rides create linked `Lesson` rows. Grooming, party, and camp reservations appear as activity cards in Day, Week, and Month and reserve their riders, coach, and location. Service reservations also participate in legacy lesson conflicts and horse recommendation eligibility. Calendar activities can be opened for editing. The desktop weekly time range expands for service reservations outside normal hours.
+
+An individual lesson is classified at $75 per rider. Assessment and grooming prices apply per participant. Party pricing applies once to the reservation, recorded against its first registered rider, and extra riders have no separate duplicate base charge. No package or service operation charges a payment method.
+
+### Enrollment and entitlement behavior
+
+Use **Riders → Plans & Entitlements → Enroll in a plan** for a lesson package. Set effective dates, ACTIVE/PAUSED/ENDED status, and notes. Profiles show the plan, price, dates, current monthly quantities, part-board relationships, preferred times, and upcoming recurring ride templates.
+
+For a part-board package use **Part Board → New/Edit agreement**. Select the rider, horse, package, dates, preferences, priority, and status. Saving creates or updates the matching package enrollment. Package changes end the old enrollment and create a new one. Used enrollments retain their rider/plan identity. Legacy agreements can remain unassigned and keep their existing free-ride configuration. Horse-focused profiles show package identity and days per week without package prices.
+
+Package periods are calendar months in `APP_TIME_ZONE`. A `PlanUsage` identifies the activity participant, rider enrollment, entitlement, service date, quantity, status, and exhaustion-override reason. Its participant links to the actual lesson when mounted. Quantities come from these explicit records. Unassigned legacy lessons are not inferred as package consumption.
+
+`USED` and `CANCELLED` records consume allowance. `RESTORED` records release it. Cancelling an activity presents **Restore package entitlements for this cancellation**. The default retains usage until a staff member explicitly chooses restoration. This provides a mechanism without defining a school cancellation policy. Cancelling can restore usage even after an enrollment or plan has expired. Repeated stale edits are rejected.
+
+Part-board package practice rides reserve the mapped horse, pass horse/rider/coach availability, consume horse workload, and respect protected recurring slots. An administrator may enter a horse-relationship override reason where required. Legacy recurring practice rides automatically use the effective matching package allowance when a package enrollment exists. Legacy unassigned recurrence continues using its original free-ride ledger. Group and semi-private recurring templates retain their existing per-rider model and are not converted into new multi-rider package activities.
+
+### API additions
+
+| Method and route | Behavior |
+| --- | --- |
+| `GET /api/plans` | Database-backed catalogue, including entitlements and payment rules |
+| `GET /api/plans/:id/quote?quantity=N` | Safe integer-cent published pricing, including birthday extras |
+| `GET /api/enrollments?date=YYYY-MM-DD&riderId=ID&agreementId=ID` | Effective enrollment and monthly balance projections |
+| `POST /api/enrollments` | Create an operational enrollment |
+| `PUT /api/enrollments/:id` | Edit dates, status, or unused enrollment details |
+| `GET /api/activities?start=YYYY-MM-DD&end=YYYY-MM-DD&riderId=ID` | Activity reservations and participant classifications |
+| `POST /api/activities` | Validate and atomically create a reservation and consumption |
+| `PUT /api/activities/:id` | Version-checked edit or cancellation/restoration |
+
+Part-board POST/PUT now accepts optional `planId`. Existing APIs remain available for legacy callers. Editing a linked activity lesson through the legacy lesson endpoint returns `ACTIVITY_EDIT_REQUIRED` so package usage and multi-rider sessions remain consistent.
+
+### Migration, seed, and verification workflow
+
+The additive migration is `20261117000000_plans_activities`. It adds the six models, foreign keys, indexes, and checks for non-negative currency, positive allowances, valid usage/enrollment statuses, and cash-only grooming. It leaves existing scheduling rows in place.
+
+Configure the development `.env` with `DATABASE_URL` and `DIRECT_URL`. For a small Supabase Session Pooler, set `connection_limit=3&pool_timeout=20` on the application connection string to avoid exhausting the shared session pool. A reachable Session Pooler may be used for `DIRECT_URL` when direct IPv6 access is unavailable.
+
+The tested commands for an existing development database are below. `CATALOG_ONLY=1` loads pricing without updating existing rider, horse, lesson, or agreement fixtures.
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm prisma:generate
+pnpm exec prisma validate
+pnpm prisma:migrate:deploy
+$env:DEMO_SEED = '1'
+$env:CATALOG_ONLY = '1'
+$env:BILLING_ENABLED = 'false'
+node --env-file=.env --import tsx prisma/seed.ts
+Remove-Item Env:CATALOG_ONLY
+pnpm build
+node --env-file=.env apps/api/dist/server.js
+```
+
+Use the existing full demo seed only in a disposable development database/schema. The script refreshes stable fictional fixture IDs and leaves non-fixture records in place. It includes all 14 plans, five enrollment scenarios, 12 activity bookings, 18 participants, and 10 usage records. Emma has 3/4 group lessons and 2/4 practice rides used, Olivia has 1/4 group lessons used, and Noah's private allowance is exhausted at 4/4. Existing fixture names and horse identities are preserved. The horse with stable ID `horse-jasper` is currently named Sassy.
+
+All demo dates are anchored to the current barn-local date. Historical current-period examples are clamped to the start of the current month. Previous calendar, availability, workload, preference, part-board, and recurrence fixtures remain populated.
+
+The following command was tested against a new isolated schema on the configured development PostgreSQL database. It applies every migration, seeds twice, checks for duplicates, verifies PostgreSQL API writes/restoration/agreements/calendars, and removes only the generated verification schema.
+
+```powershell
+node --env-file=.env scripts/verify-database.mjs
+```
+
+To explicitly reset a disposable demo database, stop its server, set both connection variables to that disposable database, and run the existing reset commands. This clears all records in that configured database.
+
+```powershell
+$env:DEMO_SEED = '1'
+$env:BILLING_ENABLED = 'false'
+pnpm exec prisma migrate reset --force --skip-seed --schema prisma/schema.prisma
+node --env-file=.env --import tsx prisma/seed.ts
+node --env-file=.env apps/api/dist/server.js
+```
+
+Verification includes type checking, lint, frontend/backend builds, Prisma validation, 52 backend tests, eight frontend tests, and the isolated PostgreSQL workflow. API tests explicitly set an empty `DATABASE_URL` so Prisma's `.env` loading cannot accidentally connect a memory-mode test to the development database. Browser interaction could not be verified because computer use stopped when it could not determine the browser URL. The existing non-failing React `act` warnings and Vite bundle-size warning remain visible in verification output.
+
+### Deferred billing and future work
+
+Billing stays disabled. The existing provider interface and disabled implementation remain intact. Plan and service classification now records the offering, published price, HST flag, rider, activity, entitlement source, applicable amount, and payment-method rule. A future provider can use those records through the existing billing boundary. No card processing, automatic invoices, payment webhooks, accounting integration, or tax-calculation logic is enabled.
+
+Future work includes authenticated staff roles, policy-approved cancellation rules, optional effective-dated pricing administration, detailed camp registrations, party horse allocation, and package-aware multi-rider recurring templates. Draft schedule generation remains a separate future feature.

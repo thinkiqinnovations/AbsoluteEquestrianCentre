@@ -56,7 +56,7 @@ if (!prisma) store.lessons.push(...demoPartBoardLessons);
 
 export class PlanningRepository {
   readonly scheduler;
-  constructor(private readonly client?: Prisma.TransactionClient) {
+  constructor(readonly client?: Prisma.TransactionClient) {
     this.scheduler = client ? new PostgresDatabase(client) : database;
   }
 
@@ -80,7 +80,8 @@ export class PlanningRepository {
       else demoAgreements.push(entry);
       return;
     }
-    const { id, startDate, endDate, preferredRideTimes, ...fields } = entry;
+    const { id, startDate, endDate, preferredRideTimes, planId: _plan, ...fields } = entry;
+    void _plan;
     const data = { ...fields, notes: fields.notes ?? null, startDate: civilDate(startDate), endDate: endDate ? civilDate(endDate) : null };
     if (existing) await this.client.partBoardAgreement.update({ where: { id }, data: { ...data, preferredRideTimes: { deleteMany: {}, create: preferredRideTimes } } });
     else await this.client.partBoardAgreement.create({ data: { id, ...data, preferredRideTimes: { create: preferredRideTimes } } });

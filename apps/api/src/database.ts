@@ -2,8 +2,9 @@ import { PrismaClient, Prisma, type Coach as PrismaCoach, type Horse as PrismaHo
 import type { CoachInput, CoachWeeklyAvailability, HorseInput, LessonInput, RiderInput, RuleInput } from '@absolute/shared';
 import { id, memoryAvailabilityRules, store } from './store.js';
 import type { Coach, Horse, Lesson, Rider } from './types.js';
+import { PlansRepository } from './plans-repository.js';
 
-export type SchedulerSnapshot = { horses: Horse[]; riders: Rider[]; coaches: Coach[]; lessons: Lesson[] };
+export type SchedulerSnapshot = { horses: Horse[]; riders: Rider[]; coaches: Coach[]; lessons: Lesson[]; reservations?: Lesson[] };
 export type DatabaseMode = 'postgres' | 'seeded-memory';
 
 const timestamp = (value: Date) => value.toISOString();
@@ -12,7 +13,7 @@ const nullableText = (value: string | undefined) => value || null;
 const toHorse = (horse: PrismaHorse): Horse => ({ ...horse, description: horse.description ?? '', notes: horse.notes ?? '', maximumDailyRideUnits: Number(horse.maximumDailyRideUnits), createdAt: timestamp(horse.createdAt), updatedAt: timestamp(horse.updatedAt) });
 const toRider = (rider: PrismaRider & { preferences: RiderHorsePreference[] }): Rider => ({ ...rider, notes: rider.notes ?? '', preferences: rider.preferences.map((preference) => ({ horseId: preference.horseId, preferenceOrder: preference.preferenceOrder, notes: preference.notes ?? '' })), createdAt: timestamp(rider.createdAt), updatedAt: timestamp(rider.updatedAt) });
 const toCoach = (coach: PrismaCoach): Coach => ({ ...coach, notes: coach.notes ?? '', createdAt: timestamp(coach.createdAt), updatedAt: timestamp(coach.updatedAt) });
-export const toLesson = (lesson: PrismaLesson): Lesson => ({ ...lesson, date: dateValue(lesson.date), occurrenceDate: lesson.occurrenceDate ? dateValue(lesson.occurrenceDate) : undefined, notes: lesson.notes ?? '', rideUnits: Number(lesson.rideUnits), createdAt: timestamp(lesson.createdAt), updatedAt: timestamp(lesson.updatedAt) });
+export const toLesson = (lesson: PrismaLesson & { activityParticipant?: { bookingId: string } | null }): Lesson => ({ ...lesson, activityId: lesson.activityParticipant?.bookingId, date: dateValue(lesson.date), occurrenceDate: lesson.occurrenceDate ? dateValue(lesson.occurrenceDate) : undefined, notes: lesson.notes ?? '', rideUnits: Number(lesson.rideUnits), createdAt: timestamp(lesson.createdAt), updatedAt: timestamp(lesson.updatedAt) });
 
 type DateRange = { start: string; end: string };
 
@@ -46,7 +47,8 @@ function coachRules(resourceId: string, windows: CoachWeeklyAvailability): RuleI
 class MemoryDatabase implements SchedulerDatabase {
   readonly mode = 'seeded-memory' as const;
   async snapshot(range?: DateRange): Promise<SchedulerSnapshot> {
-    return range ? { ...store, lessons: store.lessons.filter(({ date }) => date >= range.start && date <= range.end) } : store;
+    const reservations = await new PlansRepository().reservations();
+    return { ...store, reservations, lessons: range ? store.lessons.filter(({ date }) => date >= range.start && date <= range.end) : store.lessons };
   }
   async horses() { return store.horses; }
   async horse(entityId: string) { return store.horses.find((item) => item.id === entityId); }
@@ -88,9 +90,9 @@ export class PostgresDatabase implements SchedulerDatabase {
       this.prisma.horse.findMany({ orderBy: { name: 'asc' } }),
       this.prisma.rider.findMany({ include: { preferences: { orderBy: { preferenceOrder: 'asc' } } }, orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }] }),
       this.prisma.coach.findMany({ orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }] }),
-      this.prisma.lesson.findMany({ where: range ? { date: { gte: new Date(range.start), lte: new Date(range.end) } } : undefined }),
+      this.prisma.lesson.findMany({ include: { activityParticipant: { select: { bookingId: true } } }, where: range ? { date: { gte: new Date(range.start), lte: new Date(range.end) } } : undefined }),
     ]);
-    return { horses: horses.map(toHorse), riders: riders.map(toRider), coaches: coaches.map(toCoach), lessons: lessons.map(toLesson) };
+    return { horses: horses.map(toHorse), riders: riders.map(toRider), coaches: coaches.map(toCoach), lessons: lessons.map(toLesson), reservations: await new PlansRepository(this.prisma).reservations() };
   }
   async horses() { return (await this.prisma.horse.findMany({ orderBy: { name: 'asc' } })).map(toHorse); }
   async horse(entityId: string) { const entity = await this.prisma.horse.findUnique({ where: { id: entityId } }); return entity ? toHorse(entity) : undefined; }
@@ -113,9 +115,9 @@ export class PostgresDatabase implements SchedulerDatabase {
     });
   }
   async updateCoach(entityId: string, input: CoachInput) { try { return toCoach(await this.prisma.coach.update({ where: { id: entityId }, data: { ...input, notes: nullableText(input.notes) } })); } catch (error) { if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') return undefined; throw error; } }
-  async lessons(date?: string) { return (await this.prisma.lesson.findMany({ where: date ? { date: new Date(`${date}T00:00:00.000Z`) } : undefined, orderBy: [{ date: 'asc' }, { startTime: 'asc' }] })).map(toLesson); }
+  async lessons(date?: string) { return (await this.prisma.lesson.findMany({ include: { activityParticipant: { select: { bookingId: true } } }, where: date ? { date: new Date(`${date}T00:00:00.000Z`) } : undefined, orderBy: [{ date: 'asc' }, { startTime: 'asc' }] })).map(toLesson); }
   async riderHistory(riderId: string, start: string, end: string) {
-    return (await this.prisma.lesson.findMany({ where: {
+    return (await this.prisma.lesson.findMany({ include: { activityParticipant: { select: { bookingId: true } } }, where: {
       riderId, date: { gte: new Date(start), lte: new Date(end) }, status: { in: ['CONFIRMED', 'COMPLETED'] },
     } })).map(toLesson);
   }

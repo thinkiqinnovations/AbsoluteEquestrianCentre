@@ -11,6 +11,7 @@ const preference = intervalSchema.extend({
 export const agreementSchema = z.object({
   riderId: z.string().min(1),
   horseId: z.string().min(1),
+  planId: z.string().min(1).nullish(),
   status: z.enum(agreementStatuses).default('ACTIVE'),
   startDate: dateSchema,
   endDate: dateSchema.nullable().default(null),

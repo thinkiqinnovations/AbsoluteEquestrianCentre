@@ -36,13 +36,13 @@ describe('deferred billing', () => {
 
   it('refuses to compose the API when billing is enabled', async () => {
     vi.stubEnv('BILLING_ENABLED', 'true');
-    vi.stubEnv('DATABASE_URL', undefined);
+    vi.stubEnv('DATABASE_URL', '');
     await expect(import('../../app.js')).rejects.toThrow('no billing provider has been configured');
   });
 
   it('exposes only the public capability and still allows lesson scheduling', async () => {
     vi.stubEnv('BILLING_ENABLED', 'false');
-    vi.stubEnv('DATABASE_URL', undefined);
+    vi.stubEnv('DATABASE_URL', '');
     vi.stubEnv('DIRECT_URL', 'private-database-connection');
     const { app } = await import('../../app.js');
     await request(app).get('/api/config').expect(200, { features: { billing: false } });

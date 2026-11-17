@@ -56,6 +56,8 @@ model Horse {
 }
 
 model Rider {
+  planEnrollments RiderPlanEnrollment[]
+  activityParticipants ActivityParticipant[]
   monthlyPaymentStatuses RiderMonthlyPaymentStatus[]
   partBoardAgreements PartBoardAgreement[]
   recurringTemplates RecurringLessonTemplate[]
@@ -98,6 +100,7 @@ model Coach {
 }
 
 model Lesson {
+  activityParticipant ActivityParticipant?
   paymentStatus LessonPaymentStatus?
   id         String       @id @default(cuid())
   date       DateTime     @db.Date
@@ -149,6 +152,7 @@ enum RecurringTemplateStatus {
 }
 
 model PartBoardAgreement {
+  planEnrollments RiderPlanEnrollment[]
   id String @id @default(cuid())
   riderId String
   horseId String
@@ -170,6 +174,115 @@ model PartBoardAgreement {
   @@index([riderId, status])
   @@index([horseId, status])
   @@index([horseId, startDate, endDate])
+}
+
+model Plan {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  category String
+  description String @default("")
+  priceCents Int
+  pricePeriod String
+  hstIncluded Boolean @default(true)
+  active Boolean @default(true)
+  effectiveFrom DateTime @db.Date
+  effectiveTo DateTime? @db.Date
+  sortOrder Int @default(0)
+  durationMinutes Int?
+  includedQuantity Int?
+  additionalUnitPriceCents Int?
+  paymentMethodRule String @default("UNRESTRICTED")
+  paymentInstructions String @default("")
+  daysPerWeek Int?
+  activityTypes String[]
+  entitlements PlanEntitlement[]
+  enrollments RiderPlanEnrollment[]
+  participants ActivityParticipant[]
+}
+
+model PlanEntitlement {
+  id String @id @default(cuid())
+  planId String
+  name String
+  activityTypes String[]
+  quantity Int
+  period String @default("MONTH")
+  plan Plan @relation(fields: [planId], references: [id])
+  usages PlanUsage[]
+  @@index([planId])
+}
+
+model RiderPlanEnrollment {
+  id String @id @default(cuid())
+  riderId String
+  planId String
+  agreementId String?
+  startDate DateTime @db.Date
+  endDate DateTime? @db.Date
+  status String @default("ACTIVE")
+  notes String @default("")
+  rider Rider @relation(fields: [riderId], references: [id])
+  plan Plan @relation(fields: [planId], references: [id])
+  agreement PartBoardAgreement? @relation(fields: [agreementId], references: [id])
+  usages PlanUsage[]
+  @@index([riderId, status])
+  @@index([agreementId])
+}
+
+model ActivityBooking {
+  id String @id @default(cuid())
+  activityType String
+  date DateTime @db.Date
+  endDate DateTime? @db.Date
+  startTime String
+  endTime String
+  coachId String?
+  location String @default("")
+  capacity Int?
+  status LessonStatus
+  notes String @default("")
+  version Int @default(1)
+  participants ActivityParticipant[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([date, endDate])
+}
+
+model ActivityParticipant {
+  id String @id @default(cuid())
+  bookingId String
+  riderId String
+  horseId String?
+  lessonId String? @unique
+  planId String?
+  publishedPriceCents Int @default(0)
+  amountCents Int @default(0)
+  hstIncluded Boolean @default(true)
+  paymentMethodRule String @default("UNRESTRICTED")
+  paymentInstructions String @default("")
+  relationshipOverrideReason String @default("")
+  booking ActivityBooking @relation(fields: [bookingId], references: [id])
+  rider Rider @relation(fields: [riderId], references: [id])
+  lesson Lesson? @relation(fields: [lessonId], references: [id])
+  plan Plan? @relation(fields: [planId], references: [id])
+  usage PlanUsage?
+  @@unique([bookingId, riderId])
+}
+
+model PlanUsage {
+  id String @id @default(cuid())
+  participantId String @unique
+  enrollmentId String
+  entitlementId String
+  serviceDate DateTime @db.Date
+  quantity Int @default(1)
+  status String @default("USED")
+  overrideReason String @default("")
+  participant ActivityParticipant @relation(fields: [participantId], references: [id])
+  enrollment RiderPlanEnrollment @relation(fields: [enrollmentId], references: [id])
+  entitlement PlanEntitlement @relation(fields: [entitlementId], references: [id])
+  @@index([enrollmentId, entitlementId, serviceDate])
 }
 
 model PartBoardPreferredRideTime {

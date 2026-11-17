@@ -5,7 +5,7 @@ import { shiftMonth } from '@absolute/shared';
 afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
 
 it('keeps manual whole-month, part-board, and single-lesson statuses independent', async () => {
-  vi.stubEnv('DATABASE_URL', undefined);
+  vi.stubEnv('DATABASE_URL', '');
   vi.stubEnv('BILLING_ENABLED', 'false');
   const { app } = await import('./app.js');
   const { demoToday } = await import('./store.js');
