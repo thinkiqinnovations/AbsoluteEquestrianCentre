@@ -11,11 +11,11 @@ export const usePlans = () => useQuery({ queryKey: ['plans'], queryFn: () => api
 export function useEnrollments(date: string, riderId?: string) {
   return useQuery({ queryKey: ['enrollments', date, riderId], queryFn: () => api<EnrollmentDetails[]>(`/api/enrollments?${new URLSearchParams({ date, ...(riderId ? { riderId } : {}) })}`) });
 }
-export function PlanTerms({ plan, showPrice = true }: { plan: Plan; showPrice?: boolean }) {
+export function PlanTerms({ plan, showPrice = true, showEntitlements = true }: { plan: Plan; showPrice?: boolean; showEntitlements?: boolean }) {
   return <Stack gap={0.5}>
-    <Typography fontWeight={700}>{plan.name}</Typography>
-    {showPrice && <Typography>{planPrice(plan)} · {plan.hstIncluded ? 'HST included' : 'HST excluded'}</Typography>}
-    {plan.entitlements.map((entry) => <Typography variant="body2" key={entry.id}>{entry.quantity} {entry.name} / {entry.period.toLowerCase()}</Typography>)}
+    <Typography variant="h6">{plan.name}</Typography>
+    {showPrice && <><Typography sx={{ color: 'primary.main', fontSize: '1.5rem', fontWeight: 700 }}>{planPrice(plan)}</Typography><Typography variant="caption" color="text.secondary">{plan.hstIncluded ? 'HST included' : 'HST excluded'}</Typography></>}
+    {showEntitlements && plan.entitlements.map((entry) => <Typography variant="body2" key={entry.id}>{entry.quantity} {entry.name} / {entry.period.toLowerCase()}</Typography>)}
     {plan.durationMinutes && <Typography variant="body2">{plan.durationMinutes} minutes</Typography>}
     {plan.daysPerWeek && <Typography variant="body2">{plan.daysPerWeek} {plan.daysPerWeek === 1 ? 'day' : 'days'} / week</Typography>}
     {plan.description && <Typography variant="body2">{plan.description}</Typography>}
@@ -30,11 +30,11 @@ export function PlansPricing() {
     {plans.isPending && <Typography>Loading plans…</Typography>}
     {['LESSON_PACKAGE', 'PART_BOARD', 'ASSESSMENT', 'SINGLE_PURCHASE', 'SERVICE', 'CAMP'].map((category) => <Box key={category}>
       <Typography variant="h5" sx={{ mb: 1 }}>{readable(category)}</Typography>
-      <Stack gap={1}>{plans.data?.filter((plan) => plan.category === category).map((plan) => <Card key={plan.id}><CardContent>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(3, minmax(0, 1fr))' }, gap: 2 }}>{plans.data?.filter((plan) => plan.category === category).map((plan) => <Card key={plan.id} sx={{ borderTop: '3px solid', borderTopColor: 'secondary.main' }}><CardContent>
         <PlanTerms plan={plan} />
-        <Chip size="small" label={plan.active ? 'ACTIVE' : 'INACTIVE'} sx={{ mt: 1 }} />
+        <Chip size="small" label={plan.active ? 'ACTIVE' : 'INACTIVE'} color={plan.active ? 'success' : 'default'} sx={{ mt: 1 }} />
         <Typography variant="caption" display="block">Effective {plan.effectiveFrom} to {plan.effectiveTo ?? 'ongoing'}</Typography>
-      </CardContent></Card>)}</Stack>
+      </CardContent></Card>)}</Box>
     </Box>)}
   </Stack>;
 }
@@ -67,6 +67,6 @@ export function RiderPlans({ riderId }: { riderId: string }) {
       <ChoiceField label="Status" value={draft.status} options={['ACTIVE', 'PAUSED', 'ENDED'].map((id) => ({ id, label: id }))} onChange={(status) => setDraft({ ...draft, status: status as EnrollmentInput['status'] })} />
       <TextField label="Notes" value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} />
       {mutation.isError && <Alert severity="error">{errorMessage(mutation.error)}</Alert>}
-    </Stack></DialogContent><DialogActions><Button onClick={() => setDraft(undefined)}>Cancel</Button><Button disabled={mutation.isPending || !enrollmentSchema.safeParse(draft).success} onClick={() => mutation.mutate(draft)}>Save enrollment</Button></DialogActions></Dialog>}
+    </Stack></DialogContent><DialogActions><Button onClick={() => setDraft(undefined)}>Cancel</Button><Button variant="contained" disabled={mutation.isPending || !enrollmentSchema.safeParse(draft).success} onClick={() => mutation.mutate(draft)}>Save enrollment</Button></DialogActions></Dialog>}
   </Stack>;
 }

@@ -95,7 +95,7 @@ it('creates a part-board agreement, manages its status, and reports recurring ge
   expect(document.body.textContent).toContain('1 remaining');
   expect(document.body.textContent).toContain('Preferred times');
   await click('Edit agreement');
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Preferred ride times');
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Schedule Preferences');
   await click('Cancel');
   await click('Pause');
   await waitFor(() => expect(button('Edit agreement')).toBeUndefined());
@@ -170,6 +170,9 @@ it('navigates views, filters and opens month results in the shared lesson workfl
   await click('Clear filters');
   await click('Edit Emma Roberts on 2026-11-18 at 15:30');
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Edit Lesson');
+  for (const label of ['Rider', 'Lesson type', 'Discipline', 'Coach', 'Status']) {
+    expect(document.querySelector(`[role="dialog"] [role="combobox"][aria-label="${label}"]`), label).toBeTruthy();
+  }
   await waitFor(() => expect(button('Select Lindon')).toBeDefined());
   expect(previews.at(-1)).toMatchObject({ excludeLessonId: 'lesson-0', riderId: 'emma', date });
   expect(document.querySelector('[role="dialog"]')?.textContent).toMatch(/#1 Sassy.*75 points.*Projected workload.*Rider preference rank 1.*#2 Lindon/);

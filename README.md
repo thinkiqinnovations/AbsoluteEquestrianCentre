@@ -4,7 +4,7 @@ Absolute Equestrian Scheduler is a TypeScript monorepo for managing school horse
 
 ## Development Status
 
-**Iteration 5 adds plans, HST-inclusive pricing, rider enrollments, explicit package entitlement usage, and activity reservations.** Existing scheduling, recommendations, availability, part boarding, recurrence, manual payment status, and recent calendar improvements are preserved. Automated verification is described below. Manual browser verification remains pending because the computer-use tool could not verify the browser URL.
+**Iteration 5 adds plans, HST-inclusive pricing, rider enrollments, explicit package entitlement usage, and activity reservations.** Existing scheduling, recommendations, availability, part boarding, recurrence, manual payment status, and recent calendar improvements are preserved. The branding follow-up applies the Absolute Equestrian design system throughout the application. Verification is described below.
 
 Implemented through Iteration 4:
 
@@ -433,10 +433,42 @@ node --env-file=.env --import tsx prisma/seed.ts
 node --env-file=.env apps/api/dist/server.js
 ```
 
-Verification includes type checking, lint, frontend/backend builds, Prisma validation, 52 backend tests, eight frontend tests, and the isolated PostgreSQL workflow. API tests explicitly set an empty `DATABASE_URL` so Prisma's `.env` loading cannot accidentally connect a memory-mode test to the development database. Browser interaction could not be verified because computer use stopped when it could not determine the browser URL. The existing non-failing React `act` warnings and Vite bundle-size warning remain visible in verification output.
+Verification includes type checking, lint, frontend/backend builds, Prisma validation, 52 backend tests, and the isolated PostgreSQL workflow. The branding follow-up expands the frontend suite to 10 tests. API tests explicitly set an empty `DATABASE_URL` so Prisma's `.env` loading cannot accidentally connect a memory-mode test to the development database. Browser checks for the branding follow-up are described below. Non-failing React `act` warnings and the Vite bundle-size warning remain visible in verification output.
 
 ### Deferred billing and future work
 
 Billing stays disabled. The existing provider interface and disabled implementation remain intact. Plan and service classification now records the offering, published price, HST flag, rider, activity, entitlement source, applicable amount, and payment-method rule. A future provider can use those records through the existing billing boundary. No card processing, automatic invoices, payment webhooks, accounting integration, or tax-calculation logic is enabled.
 
 Future work includes authenticated staff roles, policy-approved cancellation rules, optional effective-dated pricing administration, detailed camp registrations, party horse allocation, and package-aware multi-rider recurring templates. Draft schedule generation remains a separate future feature.
+
+## Absolute Equestrian branding
+
+The application uses a shared navy, gold, ivory, and white design system. All colors are centralized in `apps/web/src/theme.ts` through `brandColors`, the Material UI palette, and generated `--color-*` CSS custom properties. Component files reference theme tokens. The palette is explicitly light, and the document uses `color-scheme: light` so system dark preferences do not switch the branded surfaces.
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--color-navy` | `#062862` | Header, primary buttons, navigation, prices |
+| `--color-navy-dark` | `#061A4D` | Main text and darker navy states |
+| `--color-gold` | `#D5AC35` | Active navigation, header rule, restrained accents |
+| `--color-background` | `#F7F5EE` | Warm ivory page and form background |
+| `--color-surface` | `#FFFFFF` | Cards, inputs, dialog headers/actions |
+| `--color-surface-muted` | `#EEF0F3` | Muted surfaces and workload tracks |
+| `--color-text-primary` | `#061A4D` | Main text |
+| `--color-text-secondary` | `#374151` | Secondary text |
+| `--color-border` | `#D3D6DC` | Card, field, and secondary button borders |
+| `--color-success` | `#078239` | Confirmed, active, eligible, and available states |
+| `--color-warning` | `#B98A13` | Warning indicators |
+| `--color-warning-text` | `#805B00` | Readable warning text on light surfaces |
+| `--color-error` | `#B42318` | Errors and destructive actions |
+
+The supplied logo is stored unchanged at `apps/web/public/images/absolute-equestrian-logo.png` and served at `/images/absolute-equestrian-logo.png`. It is also the favicon. The supplied asset is 150 × 150 pixels with its original navy background. The header displays it at 88 pixels on desktop and 64 pixels on compact layouts, with automatic height and `object-fit: contain`. The footer reuses it decoratively at 44 pixels.
+
+`AppShell`, `AppHeader`, and `AppFooter` live in `apps/web/src/AppShell.tsx`. The header contains the supplied logo, registered business name, ThinkIQ credit, and navigation. The active page has bold light text and a three-pixel gold underline. Below 1200 pixels, a labelled keyboard-accessible button opens the navigation. A skip link targets the main content. The footer stacks on small screens.
+
+`FormSection` in `apps/web/src/FormSection.tsx` supplies white form cards with navy serif headings and a gold accent. Add/Edit Activity uses Activity, Lesson format, Schedule, Riders, Horse, Package / Entitlement, and activity-detail sections. Part Board uses Rider & Horse, Plan, Agreement Details, Entitlements, and Schedule Preferences. Pricing cards use a gold top border, navy titles/prices, HST labels, and semantic status indicators.
+
+Shared Material UI theme overrides apply across the existing screens, profiles, dialogs, availability editor, recurring templates, payment-status forms, services, cards, inputs, tables, loading indicators, validation alerts, and buttons. Georgia supplies the existing serif heading family. Arial/Helvetica supplies body text, labels, navigation, and controls. Desktop page headings are 44 pixels and compact headings are 32 pixels. Cards have subtle borders/shadows and twelve-pixel corners. Inputs and buttons have nine-pixel corners. Primary saves are navy, secondary actions are white, and destructive actions use the error token.
+
+Responsive conventions preserve the working calendars. Week and Month use their existing mobile agendas below 900 pixels. The desktop weekly grid can scroll within its card. Pricing cards use one column on mobile, two from 900 pixels, and three from 1536 pixels. Profile actions stack below the details on phones. Form rows stack on compact screens, long select options wrap, and dialog content scrolls independently of its action buttons.
+
+Branding verification includes the 10 frontend tests, type checking, lint, and the production build. New tests check the supplied logo path, navigation expansion and active-page behavior, explicit light mode, and AA text contrast for the principal text, navigation, success, warning, and error combinations. The existing calendar test now recognizes the Schedule Preferences section name. Browser inspection covers desktop, tablet, and mobile layouts, the logo's square proportions, page widths, keyboard focus, validation, pricing, activity forms, Part Board forms, availability, profiles, and the calendars. The existing isolated migration/seed verification was rerun successfully with zero duplicate records. No pricing or scheduling data is changed by the visual update.
