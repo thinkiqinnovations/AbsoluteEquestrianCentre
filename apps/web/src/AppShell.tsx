@@ -26,7 +26,6 @@ export function AppHeader() {
             <Box>
               <Typography component="span" display="block" sx={{ fontFamily: '"Space Grotesk", Inter, sans-serif', fontWeight: 700, fontSize: { xs: 23, sm: 29 }, lineHeight: 1 }}>Think<Box component="span" sx={{ color: 'var(--header-accent)' }}>IQ</Box></Typography>
               <Typography component="span" display="block" sx={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.22em', mt: 0.5 }}>INNOVATIONS</Typography>
-              <Typography component="span" display="block" sx={{ fontSize: 10, color: 'var(--header-muted)', mt: 0.5 }}>Created by ThinkIQ Innovations Inc.</Typography>
             </Box>
           </Box>
           <Box sx={{ borderLeft: '1px solid', borderColor: 'var(--header-muted)', pl: 2, minWidth: 0 }}>
