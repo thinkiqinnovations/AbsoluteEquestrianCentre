@@ -1,35 +1,43 @@
 import { alpha, createTheme } from '@mui/material/styles';
 
 export const brandColors = {
-  navy: '#062862',
-  navyDark: '#061A4D',
-  gold: '#D5AC35',
-  background: '#F7F5EE',
-  surface: '#FFFFFF',
-  surfaceMuted: '#EEF0F3',
-  textPrimary: '#061A4D',
-  textSecondary: '#374151',
-  border: '#D3D6DC',
-  success: '#078239',
-  warning: '#B98A13',
-  warningText: '#805B00',
-  error: '#B42318',
+  navy: '#18d7f5',
+  navyDark: '#020713',
+  gold: '#18d7f5',
+  background: '#020713',
+  surface: '#0a152b',
+  surfaceMuted: '#101f39',
+  textPrimary: '#f7fbff',
+  textSecondary: '#a8b7d2',
+  border: '#304464',
+  success: '#22df8c',
+  warning: '#ffd451',
+  warningText: '#ffd451',
+  error: '#ff8a80',
 } as const;
 
-const headingFont = 'Georgia, "Times New Roman", serif';
-const bodyFont = 'Arial, "Helvetica Neue", sans-serif';
+const headingFont = '"Space Grotesk", Inter, sans-serif';
+const bodyFont = 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif';
 const cardShadow = `0 2px 8px ${alpha(brandColors.navyDark, 0.055)}`;
 
-export const theme = createTheme({
+export const lightColors = {
+  ...brandColors, navy: '#075a9c', gold: '#075a9c', background: '#f3f7fc', surface: '#ffffff',
+  surfaceMuted: '#e8eff8', textPrimary: '#10243c', textSecondary: '#45566d', border: '#c8d4e3',
+  success: '#087f45', warning: '#a66b00', warningText: '#805200', error: '#b42318',
+};
+
+export function createAppTheme(mode: 'light' | 'dark') {
+const brandColors = mode === 'light' ? lightColors : darkColors;
+return createTheme({
   palette: {
-    mode: 'light',
-    primary: { main: brandColors.navy, dark: brandColors.navyDark, contrastText: brandColors.surface },
-    secondary: { main: brandColors.gold, contrastText: brandColors.navyDark },
+    mode,
+    primary: { main: brandColors.navy, dark: '#0bb7d3', contrastText: mode === 'light' ? '#ffffff' : brandColors.navyDark },
+    secondary: { main: brandColors.gold, contrastText: mode === 'light' ? '#ffffff' : brandColors.navyDark },
     background: { default: brandColors.background, paper: brandColors.surface },
     text: { primary: brandColors.textPrimary, secondary: brandColors.textSecondary },
     divider: brandColors.border,
     success: { main: brandColors.success },
-    warning: { main: brandColors.warning, dark: brandColors.warningText, contrastText: brandColors.navyDark },
+    warning: { main: brandColors.warning, dark: brandColors.warningText, contrastText: mode === 'light' ? '#ffffff' : brandColors.navyDark },
     error: { main: brandColors.error },
     info: { main: brandColors.navy },
     action: { hover: alpha(brandColors.navy, 0.045), selected: alpha(brandColors.navy, 0.08) },
@@ -51,12 +59,12 @@ export const theme = createTheme({
     MuiCssBaseline: {
       styleOverrides: {
         ':root': Object.fromEntries(Object.entries(brandColors).map(([key, value]) => [`--color-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`, value])),
-        html: { colorScheme: 'light' },
-        body: { margin: 0, minWidth: 280 },
+        html: { colorScheme: mode },
+        body: { margin: 0, minWidth: 280, backgroundImage: mode === 'light' ? 'none' : 'radial-gradient(900px 520px at 75% 8%, rgba(57,103,255,0.16), transparent 66%), linear-gradient(180deg, #020713 0%, #081224 100%)', backgroundAttachment: 'fixed' },
         '#root': { minHeight: '100dvh', minWidth: 0 },
         '*': { boxSizing: 'border-box' },
         ':focus-visible': { outline: `3px solid ${brandColors.navy}`, outlineOffset: 3 },
-        '::selection': { backgroundColor: alpha(brandColors.gold, 0.35), color: brandColors.navyDark },
+        '::selection': { backgroundColor: alpha(brandColors.gold, 0.35), color: brandColors.textPrimary },
       },
     },
     MuiCard: { styleOverrides: { root: { minWidth: 0, border: `1px solid ${brandColors.border}`, borderRadius: 12, boxShadow: cardShadow } } },
@@ -67,11 +75,11 @@ export const theme = createTheme({
       styleOverrides: {
         root: { minHeight: 40, borderRadius: 9, lineHeight: 1.4, '&.Mui-focusVisible': { outline: `3px solid ${brandColors.navy}`, outlineOffset: 3, boxShadow: `0 0 0 5px ${alpha(brandColors.gold, 0.3)}` } },
         sizeSmall: { minHeight: 36 },
-        containedPrimary: { border: `1px solid ${brandColors.navy}`, '&:hover': { backgroundColor: brandColors.navyDark } },
+        containedPrimary: { border: `1px solid ${brandColors.navy}`, '&:hover': { backgroundColor: mode === 'light' ? '#064c83' : '#0bb7d3' } },
         outlined: { backgroundColor: brandColors.surface, borderColor: brandColors.border, '&:hover': { borderColor: brandColors.navy, backgroundColor: alpha(brandColors.navy, 0.04) } },
         outlinedError: { color: brandColors.error, borderColor: alpha(brandColors.error, 0.4), '&:hover': { borderColor: brandColors.error, backgroundColor: alpha(brandColors.error, 0.05) } },
         outlinedWarning: { color: brandColors.warningText },
-        outlinedSecondary: { color: brandColors.navyDark },
+        outlinedSecondary: { color: brandColors.navy },
         textWarning: { color: brandColors.warningText },
       },
     },
@@ -89,11 +97,14 @@ export const theme = createTheme({
     MuiDialogTitle: { styleOverrides: { root: { fontFamily: headingFont, fontSize: '1.6rem', fontWeight: 600, borderBottom: `2px solid ${brandColors.gold}`, padding: '20px 24px' } } },
     MuiDialogContent: { styleOverrides: { root: { backgroundColor: brandColors.background, padding: 24, minWidth: 0, '& .MuiFormControl-root': { minWidth: 0, maxWidth: '100%' }, '& .MuiInputBase-root': { fontSize: '1rem' } } } },
     MuiDialogActions: { styleOverrides: { root: { padding: '16px 24px', gap: 8, flexWrap: 'wrap', borderTop: `1px solid ${brandColors.border}` } } },
-    MuiAlert: { styleOverrides: { root: { borderRadius: 9, fontFamily: bodyFont }, message: { minWidth: 0, overflowWrap: 'anywhere' }, standardWarning: { color: brandColors.warningText, backgroundColor: alpha(brandColors.gold, 0.14) } } },
-    MuiChip: { styleOverrides: { root: { fontFamily: bodyFont, borderRadius: 7, fontWeight: 600 }, colorWarning: { color: brandColors.navyDark } } },
-    MuiTableCell: { styleOverrides: { head: { backgroundColor: brandColors.surfaceMuted, color: brandColors.navyDark, fontWeight: 700 }, root: { borderColor: brandColors.border } } },
+    MuiAlert: { styleOverrides: { root: { borderRadius: 9, fontFamily: bodyFont }, message: { minWidth: 0, overflowWrap: 'anywhere' }, standardWarning: { color: brandColors.warningText, backgroundColor: alpha(brandColors.warning, 0.14) } } },
+    MuiChip: { styleOverrides: { root: { fontFamily: bodyFont, borderRadius: 7, fontWeight: 600 }, colorWarning: { color: mode === 'light' ? '#ffffff' : brandColors.navyDark, '&.MuiChip-outlined': { color: brandColors.warningText, borderColor: brandColors.warningText } } } },
+    MuiTableCell: { styleOverrides: { head: { backgroundColor: brandColors.surfaceMuted, color: brandColors.textPrimary, fontWeight: 700 }, root: { borderColor: brandColors.border } } },
     MuiLinearProgress: { styleOverrides: { root: { borderRadius: 6, backgroundColor: brandColors.surfaceMuted } } },
     MuiCircularProgress: { defaultProps: { 'aria-label': 'Loading' } },
     MuiLink: { styleOverrides: { root: { textUnderlineOffset: 3 } } },
   },
 });
+}
+const darkColors = brandColors;
+export const theme = createAppTheme('dark');
