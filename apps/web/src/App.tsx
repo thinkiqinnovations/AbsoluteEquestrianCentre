@@ -179,8 +179,8 @@ function LessonDialog({ initial, onClose, onSaved }: { initial: Any; onClose: ()
   const choices = (items: Any[] | undefined, type: Resource['resourceType'], selected: string) =>
     items?.filter((item) => item.active || item.id === selected).map((item) => {
       const result = availability.data?.[type][item.id];
-      const status = result?.status === 'UNSPECIFIED' ? 'Availability not configured' : result && label(result.status);
-      const reason = result?.reason ? ` (${label(result.reason)})` : '';
+      const status = item.active === false ? 'Inactive' : result?.status === 'UNSPECIFIED' ? 'Availability not configured' : result && label(result.status);
+      const reason = item.active !== false && result?.reason ? ` (${label(result.reason)})` : '';
       return [item.id, `${type === 'HORSE' ? item.name : fullName(item)}${status ? ` · ${status}${reason}` : ''}`];
     }) ?? [];
   const mutation = useMutation({
@@ -234,6 +234,8 @@ function ManagementPage({ type }: { type: 'horses' | 'riders' | 'coaches' }) {
       throw response;
     }
     void client.invalidateQueries({ queryKey: [type] });
+    void client.invalidateQueries({ queryKey: ['schedule'] });
+    void client.invalidateQueries({ queryKey: ['horse-recommendations'] });
     if (hasWeeklyAvailability) void client.invalidateQueries({ queryKey: ['availability'] });
     setEditing(null);
   }} />}</Stack>;

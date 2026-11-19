@@ -6,6 +6,16 @@ import { appTimeZone } from './time-zone.js';
 
 const base = { date: barnToday(appTimeZone), startTime: '09:30', endTime: '10:30', riderId: 'rider-noah', horseId: 'horse-jasper', coachId: 'coach-james', lessonType: 'PRIVATE' as const, discipline: 'FLAT' as const, rideUnits: 1, status: 'CONFIRMED' as const, notes: '' };
 describe('schedule conflict detection', () => {
+  it('reports each inactive resource without changing existing assignments', () => {
+    const context = {
+      ...store,
+      horses: store.horses.map((horse) => ({ ...horse, active: false })),
+      riders: store.riders.map((rider) => ({ ...rider, active: false })),
+      coaches: store.coaches.map((coach) => ({ ...coach, active: false })),
+    };
+    expect(findConflicts(base, context).filter(({ code }) => code.endsWith('_INACTIVE')))
+      .toEqual(expect.arrayContaining(['HORSE_INACTIVE', 'RIDER_INACTIVE', 'COACH_INACTIVE'].map((code) => expect.objectContaining({ code, severity: 'ERROR' }))));
+  });
   it.each(['GROUP', 'SEMI_PRIVATE'] as const)('lets one coach teach distinct riders and horses in a %s session', (lessonType) => {
     const candidate = { ...base, lessonType };
     const existing = { ...store.lessons[0], ...candidate, riderId: 'rider-emma', horseId: 'horse-charlie' };

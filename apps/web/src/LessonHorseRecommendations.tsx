@@ -28,7 +28,7 @@ export function LessonHorseRecommendations({ query, value, current, horseName, p
 }) {
   const result = query.data;
   const eligible = result?.recommendations ?? [];
-  const ineligible = result?.ineligible ?? [];
+  const ineligible = (result?.ineligible ?? []).filter((horse) => !horse.reasons.some(({ code }) => code === 'HORSE_INACTIVE'));
   const selected = eligible.some(({ horseId }) => horseId === value);
   const unavailable = ineligible.find(({ horseId }) => horseId === value);
   const apiError = (query.error as { error?: { code?: string; message?: string } } | null)?.error;

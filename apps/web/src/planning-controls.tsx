@@ -16,10 +16,11 @@ export function ChoiceField({ label, value, options, onChange, emptyLabel }: {
   </TextField>;
 }
 
-export function usePlanningResources() {
-  const riders = useQuery({ queryKey: ['riders'], queryFn: () => api<{ id: string; firstName: string; lastName: string }[]>('/api/riders') });
-  const horses = useQuery({ queryKey: ['horses'], queryFn: () => api<{ id: string; name: string }[]>('/api/horses') });
-  const coaches = useQuery({ queryKey: ['coaches'], queryFn: () => api<{ id: string; firstName: string; lastName: string }[]>('/api/coaches') });
-  const people = (items: typeof riders.data) => items?.map(({ id, firstName, lastName }) => ({ id, label: `${firstName} ${lastName}` })) ?? [];
-  return { riders: people(riders.data), coaches: people(coaches.data), horses: horses.data?.map(({ id, name }) => ({ id, label: name })) ?? [] };
+export function usePlanningResources(activeOnly = false) {
+  const riders = useQuery({ queryKey: ['riders'], queryFn: () => api<{ id: string; firstName: string; lastName: string; active?: boolean }[]>('/api/riders') });
+  const horses = useQuery({ queryKey: ['horses'], queryFn: () => api<{ id: string; name: string; active?: boolean }[]>('/api/horses') });
+  const coaches = useQuery({ queryKey: ['coaches'], queryFn: () => api<{ id: string; firstName: string; lastName: string; active?: boolean }[]>('/api/coaches') });
+  const available = (item: { active?: boolean }) => !activeOnly || item.active !== false;
+  const people = (items: typeof riders.data) => items?.filter(available).map(({ id, firstName, lastName }) => ({ id, label: `${firstName} ${lastName}` })) ?? [];
+  return { riders: people(riders.data), coaches: people(coaches.data), horses: horses.data?.filter(available).map(({ id, name }) => ({ id, label: name })) ?? [] };
 }

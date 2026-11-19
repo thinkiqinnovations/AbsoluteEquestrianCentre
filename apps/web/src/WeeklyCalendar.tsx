@@ -29,6 +29,13 @@ export function WeeklyCalendar({ start, onAdd, onEdit, filters, onFilter }: {
   if (query.isError) return <Alert severity="error">Unable to load the weekly schedule.</Alert>;
   const { lessons, summary, conflicts } = query.data;
   const visible = lessons.filter((lesson) => matchesFilters(lesson, filters));
+  const notices = (lessonId: string) => {
+    const entries = conflicts.filter((conflict) => conflict.lessonId === lessonId);
+    if (!entries.length) return null;
+    const error = entries.some(({ severity }) => severity === 'ERROR');
+    return <Chip component="span" size="small" color={error ? 'error' : 'warning'}
+      label={error ? 'Conflict' : 'Warning'} title={[...new Set(entries.map(({ message }) => message))].join('\n')} />;
+  };
   const reservations = activities.data ?? [];
   const firstHour = Math.min(operatingHours.start, ...[...visible, ...reservations].map((lesson) => Math.floor(minutes(lesson.startTime) / 60)));
   const lastHour = Math.max(operatingHours.end, ...[...visible, ...reservations].map((lesson) => Math.ceil(minutes(lesson.endTime) / 60)));
@@ -58,6 +65,7 @@ export function WeeklyCalendar({ start, onAdd, onEdit, filters, onFilter }: {
                   sx={{ display: 'block', textAlign: 'left', overflowWrap: 'anywhere', opacity: lesson.status === 'CANCELLED' ? 0.65 : 1 }}>
                   <Typography component="span" display="block" variant="caption">{formatTime(lesson.startTime)} – {formatTime(lesson.endTime)}</Typography>
                   <Typography component="span" display="block" variant="body2">{name(lesson.rider)} · {lesson.horse.name}</Typography>
+                  {notices(lesson.id)}
                   <Typography component="span" display="block" variant="caption">
                     {lesson.coach?.firstName ?? 'Self ride'} · {lesson.discipline === 'FLAT' ? 'Flat' : 'Jump'}
                     {lesson.lessonType === 'SEMI_PRIVATE' && ' · Semi-private'}
@@ -87,6 +95,7 @@ export function WeeklyCalendar({ start, onAdd, onEdit, filters, onFilter }: {
             sx={{ display: 'block', textAlign: 'left', overflowWrap: 'anywhere', opacity: lesson.status === 'CANCELLED' ? 0.65 : 1 }}>
             <Typography component="span" display="block" variant="body2" fontWeight={700}>{formatTime(lesson.startTime)} – {formatTime(lesson.endTime)}</Typography>
             <Typography component="span" display="block" variant="body2">{name(lesson.rider)} · {lesson.horse.name}</Typography>
+            {notices(lesson.id)}
             <Typography component="span" display="block" variant="caption">
               {lesson.coach ? name(lesson.coach) : 'Self ride'} · {lesson.discipline === 'FLAT' ? 'Flat' : 'Jump'}
               {lesson.lessonType === 'SEMI_PRIVATE' && ' · Semi-private'}

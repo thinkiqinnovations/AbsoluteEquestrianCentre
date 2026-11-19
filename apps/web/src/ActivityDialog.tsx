@@ -23,7 +23,7 @@ export function ActivityDialog({ activityId, date, startTime = '09:00', onClose,
 }
 function ActivityForm({ initial, date, startTime, onClose, onSaved }: { initial?: ActivityRecord; date: string; startTime: string; onClose: () => void; onSaved: () => void }) {
   const client = useQueryClient();
-  const resources = usePlanningResources();
+  const resources = usePlanningResources(!initial);
   const [form, setForm] = useState<ActivityInput>(initial ?? { activityType: 'PRIVATE_LESSON', date, startTime, endTime: endAt(startTime, 30), status: 'CONFIRMED', discipline: 'FLAT', rideUnits: 0.5, location: '', notes: '', cancellationAction: 'RETAIN', participants: [{ riderId: '', overrideReason: '', relationshipOverrideReason: '' }] });
   const [error, setError] = useState('');
   const plans = usePlans();

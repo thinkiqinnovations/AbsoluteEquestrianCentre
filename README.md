@@ -1,5 +1,11 @@
 # Absolute Equestrian Scheduler
 
+Month lesson entries use the weekly entry structure: navy cards with start/end times, full rider and horse names, a per-lesson Conflict or Warning badge when applicable, and coach, discipline, and lesson format details. Cancelled entries remain labelled and visually muted. This applies to both the month grid and mobile agenda, preserving daily summaries, filtering, editing, and the three-entry preview with the more-results link.
+
+Inactive-resource handling: existing lessons retain their assignments and report inactive horses, riders, and coaches as errors in Day, Week, and Month. Weekly grid and mobile agenda entries display Conflict/Warning badges with notice details. Resource edits refresh schedule and horse-recommendation queries. Add Lesson lists active riders and coaches and excludes inactive horses from recommendation choices. Existing records remain available for administration and editing.
+
+Regression verification for these fixes: `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`, and `node --env-file=.env scripts/verify-database.mjs`. The database verification applies migrations to an empty isolated development schema, runs the deterministic seed twice, checks duplicates and calendar/resource endpoints, and removes its temporary schema. No migration or demo fixture changes are needed for these validation/display fixes.
+
 Absolute Equestrian Scheduler is a TypeScript monorepo for managing school horses, riders, coaches, lessons, and daily and weekly riding schedules.
 
 ## Development Status
