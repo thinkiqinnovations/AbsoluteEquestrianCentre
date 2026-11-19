@@ -4,6 +4,8 @@ import { operatingHours, weekDates } from '@absolute/shared';
 import { api } from './api';
 import { formatDate, formatTime, scheduleKeys } from './scheduling';
 import { matchesFilters, personName as name, ScheduleFilters, type CalendarLesson, type Filters } from './ScheduleFilters';
+import { ServiceActivities } from './ServiceActivities';
+import type { ActivityRecord } from './ActivityDialog';
 
 type Week = {
   lessons: CalendarLesson[];
@@ -21,13 +23,22 @@ export function WeeklyCalendar({ start, onAdd, onEdit, filters, onFilter }: {
   onEdit: (lesson: CalendarLesson) => void;
 }) {
   const query = useQuery({ queryKey: scheduleKeys.week(start), queryFn: () => api<Week>(`/api/schedule/week?start=${start}`) });
+  const dates = weekDates(start);
+  const activities = useQuery({ queryKey: ['activities', dates[0], dates[6]], queryFn: () => api<ActivityRecord[]>(`/api/activities?start=${dates[0]}&end=${dates[6]}`) });
   if (query.isPending) return <CircularProgress />;
   if (query.isError) return <Alert severity="error">Unable to load the weekly schedule.</Alert>;
   const { lessons, summary, conflicts } = query.data;
   const visible = lessons.filter((lesson) => matchesFilters(lesson, filters));
-  const dates = weekDates(start);
-  const firstHour = Math.min(operatingHours.start, ...visible.map((lesson) => Math.floor(minutes(lesson.startTime) / 60)));
-  const lastHour = Math.max(operatingHours.end, ...visible.map((lesson) => Math.ceil(minutes(lesson.endTime) / 60)));
+  const notices = (lessonId: string) => {
+    const entries = conflicts.filter((conflict) => conflict.lessonId === lessonId);
+    if (!entries.length) return null;
+    const error = entries.some(({ severity }) => severity === 'ERROR');
+    return <Chip component="span" size="small" color={error ? 'error' : 'warning'}
+      label={error ? 'Conflict' : 'Warning'} title={[...new Set(entries.map(({ message }) => message))].join('\n')} />;
+  };
+  const reservations = activities.data ?? [];
+  const firstHour = Math.min(operatingHours.start, ...[...visible, ...reservations].map((lesson) => Math.floor(minutes(lesson.startTime) / 60)));
+  const lastHour = Math.max(operatingHours.end, ...[...visible, ...reservations].map((lesson) => Math.ceil(minutes(lesson.endTime) / 60)));
   const hours = Array.from({ length: lastHour - firstHour }, (_, index) => firstHour + index);
   const columns = '84px repeat(7, minmax(132px, 1fr))';
 
@@ -38,7 +49,7 @@ export function WeeklyCalendar({ start, onAdd, onEdit, filters, onFilter }: {
       <Chip label={`${summary.horsesNearCapacity} horses near workload limit`} />
       <Chip label={`${summary.conflictCount} scheduling notices`} />
     </Stack>
-    <Card sx={{ overflowX: 'auto' }}>
+    <Card sx={{ display: { xs: 'none', md: 'block' }, overflowX: 'auto' }}>
       <Box sx={{ display: 'grid', gridTemplateColumns: columns, minWidth: 1008 }}>
         <Typography sx={{ p: 1 }}>Time</Typography>
         {dates.map((date) => <Typography key={date} fontWeight={700} sx={{ p: 1 }}>
@@ -54,6 +65,7 @@ export function WeeklyCalendar({ start, onAdd, onEdit, filters, onFilter }: {
                   sx={{ display: 'block', textAlign: 'left', overflowWrap: 'anywhere', opacity: lesson.status === 'CANCELLED' ? 0.65 : 1 }}>
                   <Typography component="span" display="block" variant="caption">{formatTime(lesson.startTime)} – {formatTime(lesson.endTime)}</Typography>
                   <Typography component="span" display="block" variant="body2">{name(lesson.rider)} · {lesson.horse.name}</Typography>
+                  {notices(lesson.id)}
                   <Typography component="span" display="block" variant="caption">
                     {lesson.coach?.firstName ?? 'Self ride'} · {lesson.discipline === 'FLAT' ? 'Flat' : 'Jump'}
                     {lesson.lessonType === 'SEMI_PRIVATE' && ' · Semi-private'}
@@ -62,6 +74,7 @@ export function WeeklyCalendar({ start, onAdd, onEdit, filters, onFilter }: {
                     {lesson.status === 'CANCELLED' && ' · Cancelled'}
                   </Typography>
                 </Button>)}
+              <ServiceActivities start={dates[0]} end={dates[6]} date={date} hour={hour} filters={filters} />
               {hour < 23 && <Button size="small" sx={{ mt: 'auto' }}
                 aria-label={`Add lesson on ${date} at ${formatTime(startTime)}`}
                 onClick={() => onAdd(date, startTime, clock((hour + 1) * 60))}>+</Button>}
@@ -69,6 +82,34 @@ export function WeeklyCalendar({ start, onAdd, onEdit, filters, onFilter }: {
           </Box>;
         })}
       </Box>
+    </Card>
+    <Card aria-label="Weekly agenda" sx={{ display: { xs: 'block', md: 'none' }, maxHeight: '65vh', overflowY: 'auto' }}>
+      {dates.map((date) => {
+        const dayLessons = visible.filter((lesson) => lesson.date === date)
+          .sort((left, right) => left.startTime.localeCompare(right.startTime) || left.endTime.localeCompare(right.endTime) || name(left.rider).localeCompare(name(right.rider)));
+        return <Stack component="section" key={date} gap={1} sx={{ p: 1.5, borderBottom: 1, borderColor: 'divider' }}>
+          <Typography fontWeight={700}>{formatDate(date, { weekday: 'long', month: 'short', day: 'numeric' })}</Typography>
+          <Typography variant="body2" color="text.secondary">{dayLessons.length} {dayLessons.length === 1 ? 'lesson' : 'lessons'}</Typography>
+          {dayLessons.map((lesson) => <Button key={lesson.id} variant="outlined" onClick={() => onEdit(lesson)}
+            aria-label={`Edit ${name(lesson.rider)} on ${date} at ${lesson.startTime}`}
+            sx={{ display: 'block', textAlign: 'left', overflowWrap: 'anywhere', opacity: lesson.status === 'CANCELLED' ? 0.65 : 1 }}>
+            <Typography component="span" display="block" variant="body2" fontWeight={700}>{formatTime(lesson.startTime)} – {formatTime(lesson.endTime)}</Typography>
+            <Typography component="span" display="block" variant="body2">{name(lesson.rider)} · {lesson.horse.name}</Typography>
+            {notices(lesson.id)}
+            <Typography component="span" display="block" variant="caption">
+              {lesson.coach ? name(lesson.coach) : 'Self ride'} · {lesson.discipline === 'FLAT' ? 'Flat' : 'Jump'}
+              {lesson.lessonType === 'SEMI_PRIVATE' && ' · Semi-private'}
+              {lesson.lessonType === 'GROUP' && ' · Group'}
+              {lesson.lessonType === 'PART_BOARD_RIDE' && ' · Part board'}
+              {lesson.status === 'CANCELLED' && ' · Cancelled'}
+            </Typography>
+          </Button>)}
+          <ServiceActivities start={dates[0]} end={dates[6]} date={date} filters={filters} />
+          {dayLessons.length === 0 && <Typography variant="body2" color="text.secondary">No lessons scheduled.</Typography>}
+          <Button size="small" sx={{ alignSelf: 'flex-start' }} aria-label={`Add lesson on ${date}`}
+            onClick={() => onAdd(date, clock(operatingHours.start * 60), clock((operatingHours.start + 1) * 60))}>Add lesson</Button>
+        </Stack>;
+      })}
     </Card>
     {conflicts.filter(({ lessonId }) => visible.some(({ id }) => id === lessonId)).map((conflict, index) =>
       <Alert key={`${conflict.lessonId}-${index}`} severity={conflict.severity === 'ERROR' ? 'error' : 'warning'}>{conflict.message}</Alert>)}

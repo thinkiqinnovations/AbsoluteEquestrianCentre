@@ -2,7 +2,7 @@ import { RIDER_LEVEL_RANK, WORKLOAD_THRESHOLDS, type LessonInput } from '@absolu
 import type { Coach, Conflict, Horse, Lesson, Rider } from './types.js';
 import { overlaps } from './intervals.js';
 
-type Context = { horses: Horse[]; riders: Rider[]; coaches: Coach[]; lessons: Lesson[] };
+type Context = { horses: Horse[]; riders: Rider[]; coaches: Coach[]; lessons: Lesson[]; reservations?: Lesson[] };
 const active = (lesson: Lesson) => lesson.status !== 'CANCELLED';
 
 export function horseWorkload(horse: Horse, candidate: LessonInput, lessons: Lesson[], ignoredLessonId?: string) {
@@ -18,7 +18,9 @@ export function findConflicts(candidate: LessonInput, context: Context, ignoredL
   const conflicts: Conflict[] = [];
   if (!horse || !rider || (!coach && (candidate.coachId || (!allowUnselectedCoach && candidate.lessonType !== 'PART_BOARD_RIDE')))) return [{ code: 'REFERENCE_NOT_FOUND', severity: 'ERROR', message: 'Rider, horse, or coach was not found.' }];
   if (!horse.active) conflicts.push({ code: 'HORSE_INACTIVE', severity: 'ERROR', message: `${horse.name} is inactive.` });
-  const sameDay = context.lessons.filter((lesson) => lesson.id !== ignoredLessonId && lesson.date === candidate.date && active(lesson));
+  if (!rider.active) conflicts.push({ code: 'RIDER_INACTIVE', severity: 'ERROR', message: `Rider ${rider.firstName} ${rider.lastName} is inactive.` });
+  if (coach && !coach.active) conflicts.push({ code: 'COACH_INACTIVE', severity: 'ERROR', message: `Coach ${coach.firstName} ${coach.lastName} is inactive.` });
+  const sameDay = [...context.lessons, ...(context.reservations ?? [])].filter((lesson) => lesson.id !== ignoredLessonId && lesson.date === candidate.date && active(lesson));
   const doubleBooked = (field: 'horseId' | 'riderId', code: string, subject: string) => {
     if (sameDay.some((lesson) => lesson[field] === candidate[field] && overlaps(candidate, lesson))) conflicts.push({ code, severity: 'ERROR', message: `${subject} is already assigned during this time.` });
   };

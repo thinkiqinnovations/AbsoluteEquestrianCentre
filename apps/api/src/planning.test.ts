@@ -16,7 +16,7 @@ const ride: LessonInput = {
 afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
 
 async function seededApi() {
-  vi.stubEnv('DATABASE_URL', undefined);
+  vi.stubEnv('DATABASE_URL', '');
   vi.stubEnv('BILLING_ENABLED', 'false');
   vi.stubEnv('MAX_ACTIVE_PART_BOARDERS_PER_HORSE', '1');
   return request((await import('./app.js')).app);

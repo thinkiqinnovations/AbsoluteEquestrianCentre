@@ -60,7 +60,7 @@ export function RecurringLessons({ agreements, resources, date }: { agreements: 
       <Stack direction="row" gap={1} flexWrap="wrap">
         <Button onClick={() => edit(template)}>Edit template</Button>
         {template.status === 'ACTIVE' && <Button disabled={save.isPending} onClick={() => save.mutate({ ...template, status: 'PAUSED' })}>Pause template</Button>}
-        {template.status !== 'ENDED' && <Button disabled={save.isPending} onClick={() => save.mutate({ ...template, status: 'ENDED' })}>End template</Button>}
+        {template.status !== 'ENDED' && <Button color="error" disabled={save.isPending} onClick={() => save.mutate({ ...template, status: 'ENDED' })}>End template</Button>}
         {template.status === 'ACTIVE' && template.id && <Button disabled={generate.isPending} onClick={() => generate.mutate(template.id!)}>Generate lessons</Button>}
       </Stack>
     </CardContent></Card>)}

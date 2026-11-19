@@ -36,6 +36,15 @@ This guide deploys Absolute Equestrian Scheduler as one Node.js service on Rende
 
 The initial database starts empty. Add horses, riders, and coaches through the application before scheduling lessons.
 
+### Development environment
+
+Keep the production and development environments isolated:
+
+- Create the production Blueprint from the `master` branch. Its service is `absolute-equestrian-scheduler` and it uses the production Supabase project.
+- Create a second Blueprint from the `Development` branch. Its branch-specific `render.yaml` names the service `absolute-equestrian-scheduler-development` and it must use a separate Supabase project.
+- Enter the development project's **Session Pooler** string for both `DATABASE_URL` and `DIRECT_URL` when the host cannot reach Supabase's IPv6-only direct endpoint. This project has been tested with Prisma migrations through the Session Pooler.
+- Never copy production database variables into the Development service, and never point the production service at the development Supabase project.
+
 ## 3. Verify the deployment
 
 1. Open the Render service URL.

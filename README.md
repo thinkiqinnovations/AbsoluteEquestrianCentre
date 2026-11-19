@@ -1,10 +1,16 @@
 # Absolute Equestrian Scheduler
 
+Month lesson entries use the weekly entry structure: navy cards with start/end times, full rider and horse names, a per-lesson Conflict or Warning badge when applicable, and coach, discipline, and lesson format details. Cancelled entries remain labelled and visually muted. This applies to both the month grid and mobile agenda, preserving daily summaries, filtering, editing, and the three-entry preview with the more-results link.
+
+Inactive-resource handling: existing lessons retain their assignments and report inactive horses, riders, and coaches as errors in Day, Week, and Month. Weekly grid and mobile agenda entries display Conflict/Warning badges with notice details. Resource edits refresh schedule and horse-recommendation queries. Add Lesson lists active riders and coaches and excludes inactive horses from recommendation choices. Existing records remain available for administration and editing.
+
+Regression verification for these fixes: `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`, and `node --env-file=.env scripts/verify-database.mjs`. The database verification applies migrations to an empty isolated development schema, runs the deterministic seed twice, checks duplicates and calendar/resource endpoints, and removes its temporary schema. No migration or demo fixture changes are needed for these validation/display fixes.
+
 Absolute Equestrian Scheduler is a TypeScript monorepo for managing school horses, riders, coaches, lessons, and daily and weekly riding schedules.
 
 ## Development Status
 
-**Iteration 4 is complete.** It includes explainable horse recommendations in Add/Edit Lesson, plus Day, Week, and Month scheduling, availability, shared-coach bookings, part boarding, recurring lessons, and manual payment-status records.
+**Iteration 5 adds plans, HST-inclusive pricing, rider enrollments, explicit package entitlement usage, and activity reservations.** Existing scheduling, recommendations, availability, part boarding, recurrence, manual payment status, and recent calendar improvements are preserved. The branding follow-up applies the Absolute Equestrian design system throughout the application. Verification is described below.
 
 Implemented through Iteration 4:
 
@@ -33,7 +39,7 @@ Authentication, automatic schedule generation, and active billing are deferred.
 - [x] Tests proving billing remains disabled
 - [ ] Billing database models
 - [ ] Billing account management
-- [ ] Price catalogue
+- [x] Operational plans and pricing catalogue
 - [ ] Active billing provider
 - [ ] Checkout
 - [ ] Invoices
@@ -139,7 +145,7 @@ See [deployguide.md](deployguide.md) for the full Supabase, Render, verification
 1. In Supabase, create a project and obtain:
    - the Session Pooler connection string for `DATABASE_URL`;
    - the direct connection string for `DIRECT_URL`.
-2. In Render, create a Blueprint from this GitHub repository. `render.yaml` supplies the build (including the Prisma migration), start, health-check, and Node environment configuration.
+2. In Render, create a Blueprint from this GitHub repository. Use `master` for production and `Development` for the isolated development environment; `render.yaml` supplies the build (including the Prisma migration), start, health-check, and Node environment configuration.
 3. Enter `DATABASE_URL` and `DIRECT_URL` as secret Render environment variables. Do not commit them.
 4. The Blueprint uses Render's `free` plan for a no-cost pilot. It sleeps after inactivity; use a paid always-on plan before staff depend on the service day to day.
 5. Point the Namecheap domain to the Render service according to Render’s custom-domain instructions. Express serves both the application and its API under that domain, so `CORS_ORIGIN` is optional. Set it only if a separate frontend origin is introduced.
@@ -156,7 +162,7 @@ Prisma migrations are stored in `prisma/migrations/`. Apply pending migrations b
 
 ## Scheduling and availability
 
-- To book a shared session, add one lesson per rider and horse with the same coach, date, start and end times, discipline, and lesson type. Choose **Semi-private** for up to two riders or **Group** for a larger session. Each rider and horse still has its own booking, availability checks, and workload rules. Other overlapping sessions with the same coach are rejected.
+- New shared sessions use **Add Lesson / Activity**. Select all riders and their horses together. Semi-private requires exactly two riders for 30 minutes. Group requires three to six riders for 60 minutes. Private requires one rider for 30 minutes. Each rider and horse still has its own booking, availability checks, and workload rules. Legacy unassigned bookings retain their original durations and editing behavior.
 
 - `APP_TIME_ZONE` defaults to `America/Toronto`. The scheduler exchanges barn-local dates (`YYYY-MM-DD`) and wall-clock times (`HH:mm`). The API supplies the configured time zone to the web app. Date navigation and weekly rules use civil calendar arithmetic.
 - Switch between **Day** and **Week** on the Schedule page. The Material UI weekly grid defaults to 8 AM–9 PM and expands for lessons outside those hours. Select a lesson to edit it or select a time slot to open Add Lesson with that date and time filled in.
@@ -170,8 +176,8 @@ Prisma migrations are stored in `prisma/migrations/`. Apply pending migrations b
 
 Day, Week, and Month are projections over the same lessons. Availability, workload, compatibility, double booking, and validation rules remain in the API. The selected date and view can be bookmarked, for example `/schedule?view=month&date=2026-11-14`.
 
-- **Day** shows detailed lessons, horse workload, and scheduling notices. It uses `GET /api/schedule?date=YYYY-MM-DD`.
-- **Week** shows seven days of lesson blocks for short-term resource planning. It uses `GET /api/schedule/week?start=YYYY-MM-DD`.
+- **Day** groups lessons under colored `Coach: Name (ride time)` headings. Each rider row has a `Rider:` label, status above ride units, editing, and manual payment indicators. Scheduling Attention displays unique message/severity pairs. It uses `GET /api/schedule?date=YYYY-MM-DD`.
+- **Week** shows seven days of lesson blocks for short-term resource planning, with a scrollable daily agenda on phones and smaller tablets. It uses `GET /api/schedule/week?start=YYYY-MM-DD`.
 - **Month** shows lesson counts, compact previews, and labelled conflict, availability, and workload indicators. It loads the month from `GET /api/schedule/month?year=YYYY&month=MM`. Select a date or **+N more** to open Day view, or select a lesson to edit it in place. On phones the month appears as a scrollable agenda. Adjacent dates in the desktop grid are muted and link to Day view.
 
 Day, Week, and Month share coach, horse, rider, discipline, and lesson-type filters. Month workload indicators reflect the full daily workload of horses represented by the filtered lessons. Coach-less part-board rides are labelled in all three views.
@@ -316,6 +322,171 @@ A future billing service will validate the reference, resolve the rider's billin
 - Part-board free rides are scheduling entitlements. Usage is recorded independently of billing, and every part-board ride counts toward horse workload.
 - Weekly templates generate persisted lessons through normal validation. Generated bookings retain their original occurrence date for duplicate prevention.
 
-## Next Iteration
+## Iteration 5 plans and activities
 
-Iteration 5 should focus on generating draft schedules from rider requests, availability, workload, recommendations, part-board priority, and recurring commitments. Drafts should explain unresolved requests and require manual approval before publishing.
+An **activity type** describes what happens, such as an assessment, group lesson, or practice ride. A **plan** defines the published offering and its HST-inclusive price. A **rider plan enrollment** links a rider to an effective package. A **plan entitlement** defines an allowed monthly quantity. An **activity booking** is the dated reservation, with explicit participants and financial classification. Mounted participants link to the existing `Lesson` rows so horse workload, availability, recommendations, conflicts, and calendars continue using the same scheduling rules.
+
+The new Prisma models are `Plan`, `PlanEntitlement`, `RiderPlanEnrollment`, `ActivityBooking`, `ActivityParticipant`, and `PlanUsage`. All additions are nullable relationships from existing records. Existing lessons, part-board agreements, historical preferences, manual payment statuses, and recurring templates remain usable as legacy/unassigned records.
+
+### Current price configuration
+
+All prices are CAD and include HST. Integer cents are stored in PostgreSQL. The UI reads prices through the API. No tax is added to the supplied totals.
+
+| Offering | HST-inclusive price | Includes |
+| --- | --- | --- |
+| Monthly Group | $215/month | 4 Group Lessons |
+| Monthly Semi-Private | $215/month | 4 Semi-Private Lessons |
+| Monthly Private | $256/month | 4 Private Lessons |
+| 1 Day Part Board, Group / Semi-Private | $269/month | 4 Group or Semi-Private Lessons in a shared allowance |
+| 1 Day Part Board, Private | $310/month | 4 Private Lessons |
+| 2 Day Part Board, Lessons + Practice Rides | $440/month | 4 Group Lessons and 4 Practice Rides |
+| 2 Day Part Board, Lessons Only | $538/month | 8 Group Lessons |
+| 3 Day Part Board, Lessons + Practice Rides | $645/month | 8 Group Lessons and 4 Practice Rides |
+| 3 Day Part Board, Lessons Only | $807/month | 12 Group Lessons |
+| Half Hour Assessment | $60 | 30 minutes, one rider |
+| Single Lesson | $75 | Private, Semi-Private, or Group format |
+| Grooming & Tacking | $30 | 90 minutes, CASH ONLY |
+| Birthday Party | $430 base | Up to 6 riders, 1 hour lesson and 1 hour barn/party room |
+| Seasonal Camp | $678/week | A service/program reservation |
+
+The **Plans & Pricing** screen is read-only. Administrators can update configuration through the database. Future pricing edits should use effective-dated plan versions when historical package allocations must be preserved. Booked participants keep published-price, applicable-amount, HST, and payment-rule snapshots.
+
+Grooming & Tacking stores `CASH_ONLY` and the instruction **Cash only - exact change please.** as configuration. A database check and backend validation enforce that rule.
+
+Birthday pricing stores the base price, included quantity of six, and additional-unit price of $60. The backend calculates $430 for six, $490 for seven, and $550 for eight, with the additional quantity clamped to zero below six. Party bookings reserve the registered riders, coach, and optional room/location for two hours. Individual horse assignments during a party are outside this iteration's party reservation workflow.
+
+Camps store a start/end date, selected riders, capacity, and reservation status. A reservation covers at most seven consecutive dates, with a daily start/end time and a $678 weekly classification per rider. A one-day camp reservation also uses the weekly price. Staff should confirm this assumption before adopting a separate partial-week price. Camp registration administration, seasonal rosters, and payments remain future work.
+
+### Add Lesson and activity workflow
+
+1. Select an activity type. Lesson formats have separate Group, Semi-Private, and Private choices. Assessments default to 30 minutes, lessons to 60/30/30, practice rides to 60, grooming to 90, parties to 120, and camps to an eight-hour daily window.
+2. Set the date, riding time, coach, and optional arena/location. For mounted activities select discipline, ride units, riders, and a recommended horse for each rider.
+3. Select all participants together. The backend validates private, semi-private, and group capacity and enforces activity duration.
+4. The form finds effective enrollments for each rider and automatically selects an applicable available entitlement. Select another valid entitlement source or individual purchase when appropriate.
+5. Review the monthly allocation, used quantity, and remaining balance. A new booking preview shows the balance before and after one use. Editing a booking retains its original source. If an entitlement is exhausted, staff must enter an override reason to continue.
+6. Save the activity. All participant bookings and consumption records are written atomically under the existing PostgreSQL scheduling lock. Editing uses a version number to reject stale changes. A completed activity keeps its financial/usage history.
+
+Assessments, lessons, and practice rides create linked `Lesson` rows. Grooming, party, and camp reservations appear as activity cards in Day, Week, and Month and reserve their riders, coach, and location. Service reservations also participate in legacy lesson conflicts and horse recommendation eligibility. Calendar activities can be opened for editing. The desktop weekly time range expands for service reservations outside normal hours.
+
+An individual lesson is classified at $75 per rider. Assessment and grooming prices apply per participant. Party pricing applies once to the reservation, recorded against its first registered rider, and extra riders have no separate duplicate base charge. No package or service operation charges a payment method.
+
+### Enrollment and entitlement behavior
+
+Use **Riders → Plans & Entitlements → Enroll in a plan** for a lesson package. Set effective dates, ACTIVE/PAUSED/ENDED status, and notes. Profiles show the plan, price, dates, current monthly quantities, part-board relationships, preferred times, and upcoming recurring ride templates.
+
+For a part-board package use **Part Board → New/Edit agreement**. Select the rider, horse, package, dates, preferences, priority, and status. Saving creates or updates the matching package enrollment. Package changes end the old enrollment and create a new one. Used enrollments retain their rider/plan identity. Legacy agreements can remain unassigned and keep their existing free-ride configuration. Horse-focused profiles show package identity and days per week without package prices.
+
+Package periods are calendar months in `APP_TIME_ZONE`. A `PlanUsage` identifies the activity participant, rider enrollment, entitlement, service date, quantity, status, and exhaustion-override reason. Its participant links to the actual lesson when mounted. Quantities come from these explicit records. Unassigned legacy lessons are not inferred as package consumption.
+
+`USED` and `CANCELLED` records consume allowance. `RESTORED` records release it. Cancelling an activity presents **Restore package entitlements for this cancellation**. The default retains usage until a staff member explicitly chooses restoration. This provides a mechanism without defining a school cancellation policy. Cancelling can restore usage even after an enrollment or plan has expired. Repeated stale edits are rejected.
+
+Part-board package practice rides reserve the mapped horse, pass horse/rider/coach availability, consume horse workload, and respect protected recurring slots. An administrator may enter a horse-relationship override reason where required. Legacy recurring practice rides automatically use the effective matching package allowance when a package enrollment exists. Legacy unassigned recurrence continues using its original free-ride ledger. Group and semi-private recurring templates retain their existing per-rider model and are not converted into new multi-rider package activities.
+
+### API additions
+
+| Method and route | Behavior |
+| --- | --- |
+| `GET /api/plans` | Database-backed catalogue, including entitlements and payment rules |
+| `GET /api/plans/:id/quote?quantity=N` | Safe integer-cent published pricing, including birthday extras |
+| `GET /api/enrollments?date=YYYY-MM-DD&riderId=ID&agreementId=ID` | Effective enrollment and monthly balance projections |
+| `POST /api/enrollments` | Create an operational enrollment |
+| `PUT /api/enrollments/:id` | Edit dates, status, or unused enrollment details |
+| `GET /api/activities?start=YYYY-MM-DD&end=YYYY-MM-DD&riderId=ID` | Activity reservations and participant classifications |
+| `POST /api/activities` | Validate and atomically create a reservation and consumption |
+| `PUT /api/activities/:id` | Version-checked edit or cancellation/restoration |
+
+Part-board POST/PUT now accepts optional `planId`. Existing APIs remain available for legacy callers. Editing a linked activity lesson through the legacy lesson endpoint returns `ACTIVITY_EDIT_REQUIRED` so package usage and multi-rider sessions remain consistent.
+
+### Migration, seed, and verification workflow
+
+The additive migration is `20261117000000_plans_activities`. It adds the six models, foreign keys, indexes, and checks for non-negative currency, positive allowances, valid usage/enrollment statuses, and cash-only grooming. It leaves existing scheduling rows in place.
+
+Configure the development `.env` with `DATABASE_URL` and `DIRECT_URL`. For a small Supabase Session Pooler, set `connection_limit=3&pool_timeout=20` on the application connection string to avoid exhausting the shared session pool. A reachable Session Pooler may be used for `DIRECT_URL` when direct IPv6 access is unavailable.
+
+The tested commands for an existing development database are below. `CATALOG_ONLY=1` loads pricing without updating existing rider, horse, lesson, or agreement fixtures.
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm prisma:generate
+pnpm exec prisma validate
+pnpm prisma:migrate:deploy
+$env:DEMO_SEED = '1'
+$env:CATALOG_ONLY = '1'
+$env:BILLING_ENABLED = 'false'
+node --env-file=.env --import tsx prisma/seed.ts
+Remove-Item Env:CATALOG_ONLY
+pnpm build
+node --env-file=.env apps/api/dist/server.js
+```
+
+Use the existing full demo seed only in a disposable development database/schema. The script refreshes stable fictional fixture IDs and leaves non-fixture records in place. It includes all 14 plans, five enrollment scenarios, 12 activity bookings, 18 participants, and 10 usage records. Emma has 3/4 group lessons and 2/4 practice rides used, Olivia has 1/4 group lessons used, and Noah's private allowance is exhausted at 4/4. Existing fixture names and horse identities are preserved. The horse with stable ID `horse-jasper` is currently named Sassy.
+
+All demo dates are anchored to the current barn-local date. Historical current-period examples are clamped to the start of the current month. Previous calendar, availability, workload, preference, part-board, and recurrence fixtures remain populated.
+
+The following command was tested against a new isolated schema on the configured development PostgreSQL database. It applies every migration, seeds twice, checks for duplicates, verifies PostgreSQL API writes/restoration/agreements/calendars, and removes only the generated verification schema.
+
+```powershell
+node --env-file=.env scripts/verify-database.mjs
+```
+
+To explicitly reset a disposable demo database, stop its server, set both connection variables to that disposable database, and run the existing reset commands. This clears all records in that configured database.
+
+```powershell
+$env:DEMO_SEED = '1'
+$env:BILLING_ENABLED = 'false'
+pnpm exec prisma migrate reset --force --skip-seed --schema prisma/schema.prisma
+node --env-file=.env --import tsx prisma/seed.ts
+node --env-file=.env apps/api/dist/server.js
+```
+
+Verification includes type checking, lint, frontend/backend builds, Prisma validation, 52 backend tests, and the isolated PostgreSQL workflow. The branding follow-up expands the frontend suite to 10 tests. API tests explicitly set an empty `DATABASE_URL` so Prisma's `.env` loading cannot accidentally connect a memory-mode test to the development database. Browser checks for the branding follow-up are described below. Non-failing React `act` warnings and the Vite bundle-size warning remain visible in verification output.
+
+### Deferred billing and future work
+
+Billing stays disabled. The existing provider interface and disabled implementation remain intact. Plan and service classification now records the offering, published price, HST flag, rider, activity, entitlement source, applicable amount, and payment-method rule. A future provider can use those records through the existing billing boundary. No card processing, automatic invoices, payment webhooks, accounting integration, or tax-calculation logic is enabled.
+
+Future work includes authenticated staff roles, policy-approved cancellation rules, optional effective-dated pricing administration, detailed camp registrations, party horse allocation, and package-aware multi-rider recurring templates. Draft schedule generation remains a separate future feature.
+
+## Absolute Equestrian branding
+
+The application uses a shared navy, gold, ivory, and white design system. All colors are centralized in `apps/web/src/theme.ts` through `brandColors`, the Material UI palette, and generated `--color-*` CSS custom properties. Component files reference theme tokens. The palette is explicitly light, and the document uses `color-scheme: light` so system dark preferences do not switch the branded surfaces.
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--color-navy` | `#062862` | Header, primary buttons, navigation, prices |
+| `--color-navy-dark` | `#061A4D` | Main text and darker navy states |
+| `--color-gold` | `#D5AC35` | Active navigation, header rule, restrained accents |
+| `--color-background` | `#F7F5EE` | Warm ivory page and form background |
+| `--color-surface` | `#FFFFFF` | Cards, inputs, dialog headers/actions |
+| `--color-surface-muted` | `#EEF0F3` | Muted surfaces and workload tracks |
+| `--color-text-primary` | `#061A4D` | Main text |
+| `--color-text-secondary` | `#374151` | Secondary text |
+| `--color-border` | `#D3D6DC` | Card, field, and secondary button borders |
+| `--color-success` | `#078239` | Confirmed, active, eligible, and available states |
+| `--color-warning` | `#B98A13` | Warning indicators |
+| `--color-warning-text` | `#805B00` | Readable warning text on light surfaces |
+| `--color-error` | `#B42318` | Errors and destructive actions |
+
+The supplied logo is stored unchanged at `apps/web/public/images/absolute-equestrian-logo.png` and served at `/images/absolute-equestrian-logo.png`. It is also the favicon. The supplied asset is 150 × 150 pixels with its original navy background. The header displays it at 88 pixels on desktop and 64 pixels on compact layouts, with automatic height and `object-fit: contain`. The footer reuses it decoratively at 44 pixels.
+
+`AppShell`, `AppHeader`, and `AppFooter` live in `apps/web/src/AppShell.tsx`. The header contains the supplied logo, registered business name, ThinkIQ credit, and navigation. The active page has bold light text and a three-pixel gold underline. Below 1200 pixels, a labelled keyboard-accessible button opens the navigation. A skip link targets the main content. The footer stacks on small screens.
+
+`FormSection` in `apps/web/src/FormSection.tsx` supplies white form cards with navy serif headings and a gold accent. Add/Edit Activity uses Activity, Lesson format, Schedule, Riders, Horse, Package / Entitlement, and activity-detail sections. Part Board uses Rider & Horse, Plan, Agreement Details, Entitlements, and Schedule Preferences. Pricing cards use a gold top border, navy titles/prices, HST labels, and semantic status indicators.
+
+Shared Material UI theme overrides apply across the existing screens, profiles, dialogs, availability editor, recurring templates, payment-status forms, services, cards, inputs, tables, loading indicators, validation alerts, and buttons. Georgia supplies the existing serif heading family. Arial/Helvetica supplies body text, labels, navigation, and controls. Desktop page headings are 44 pixels and compact headings are 32 pixels. Cards have subtle borders/shadows and twelve-pixel corners. Inputs and buttons have nine-pixel corners. Primary saves are navy, secondary actions are white, and destructive actions use the error token.
+
+Responsive conventions preserve the working calendars. Week and Month use their existing mobile agendas below 900 pixels. The desktop weekly grid can scroll within its card. Pricing cards use one column on mobile, two from 900 pixels, and three from 1536 pixels. Profile actions stack below the details on phones. Form rows stack on compact screens, long select options wrap, and dialog content scrolls independently of its action buttons.
+
+Branding verification includes the 10 frontend tests, type checking, lint, and the production build. New tests check the supplied logo path, navigation expansion and active-page behavior, explicit light mode, and AA text contrast for the principal text, navigation, success, warning, and error combinations. The existing calendar test now recognizes the Schedule Preferences section name. Browser inspection covers desktop, tablet, and mobile layouts, the logo's square proportions, page widths, keyboard focus, validation, pricing, activity forms, Part Board forms, availability, profiles, and the calendars. The existing isolated migration/seed verification was rerun successfully with zero duplicate records. No pricing or scheduling data is changed by the visual update.
+
+## ThinkIQ application theme
+
+The application now follows https://thinkiqinnovations.com/ across shared screens and controls: dark background (#020713), dark panels (#0a152b), cyan accents (#18d7f5), light text (#f7fbff), and muted text (#a8b7d2). Shared tokens and Material UI overrides remain in apps/web/src/theme.ts. Existing navy/gold token names are retained for compatibility and now resolve to the ThinkIQ accent colors. Inter is the body font and Space Grotesk the heading font, loaded through Google Fonts with local sans-serif fallbacks. The explicit dark color scheme applies regardless of system preference. Green success, amber warnings, and red errors retain semantic meanings. Layouts and scheduling behavior are unchanged.
+
+The transparent ThinkIQ logo is apps/web/public/images/thinkiq-innovations-logo.png and is used in the header, favicon, and Apple touch icon. Absolute Equestrian Centre remains the secondary header identity; its existing footer asset is preserved. This section supersedes the earlier ivory/navy/gold visual specification above. Theme verification uses frontend tests (including AA text contrast and header navigation), lint, TypeScript checking through the frontend production build, and browser inspection of the Schedule page. No database changes or new demo fixtures are required for this visual-only update.
+
+Light and dark themes: light is the default for new visitors. The theme button above page content switches modes and saves the preference locally under thinkiq-ui-theme. The header remains dark and identical in both modes. createAppTheme in theme.ts shares typography and component styling across the two palettes; ThemePreference.tsx owns the preference and toggle. Storage restrictions fall back to a working, session-only toggle. No scheduling data or demo fixtures change.
+
+Outlined warning badges, including unpaid payment indicators, use theme-specific amber text and borders instead of filled-badge text colors. Regression tests verify the shared override and at least 4.5:1 text contrast against both light and dark card surfaces.
+
+The Light/Dark preference is now an accessible switch in the header, with visible Light and Dark labels. Off selects light and on selects dark; the default and locally saved preference behavior are unchanged. The header retains the same dark styling in both modes, and the previous page-content theme button is removed.

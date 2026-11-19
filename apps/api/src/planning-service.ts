@@ -7,6 +7,8 @@ import type { Conflict, Lesson } from './types.js';
 import type { SchedulerSnapshot } from './database.js';
 import { type Template, compareTemplatePriority, occurrenceDates } from './recurring.js';
 import { appTimeZone } from './time-zone.js';
+import { PlansRepository } from './plans-repository.js';
+import { enrollmentDetails, saveActivity } from './plans-service.js';
 
 export const maxPartBoarders = z.coerce.number().int().min(1).max(100).parse(process.env.MAX_ACTIVE_PART_BOARDERS_PER_HORSE ?? 1);
 export const generationWeeks = z.coerce.number().int().min(1).max(52).parse(process.env.RECURRING_LESSON_GENERATION_WEEKS ?? 8);
@@ -22,7 +24,21 @@ export async function priorityContext(repository: PlanningRepository, date: stri
     agreements ?? repository.agreements(),
     usage ?? repository.usages(),
   ]);
-  return { templates: templates.filter(({ id }) => !existing.includes(id)), agreements: activeAgreements, usage: currentUsage };
+  const packages = new PlansRepository(repository.client);
+  const enrollments = (await enrollmentDetails(packages, date)).filter((entry) => entry.effective && entry.agreementId);
+  const packageAgreementIds = new Set(enrollments.map(({ agreementId }) => agreementId));
+  const packageUsage = (await packages.usages()).flatMap((entry): Usage[] => {
+    const enrollment = enrollments.find(({ id }) => id === entry.enrollmentId);
+    const entitlement = enrollment?.entitlements.find(({ id }) => id === entry.entitlementId);
+    return enrollment?.agreementId && entitlement?.activityTypes.includes('PRACTICE_RIDE') && entry.status !== 'RESTORED'
+      ? [{ agreementId: enrollment.agreementId, lessonId: entry.participantId, entitlementDate: entry.serviceDate, quantity: entry.quantity }] : [];
+  });
+  const projectedAgreements = activeAgreements.map((agreement) => {
+    const enrollment = enrollments.find((entry) => entry.agreementId === agreement.id);
+    return enrollment ? { ...agreement, entitlementPeriod: 'MONTH' as const, freeRidesPerPeriod: enrollment.entitlements.find((entry) => entry.activityTypes.includes('PRACTICE_RIDE'))?.quantity ?? 0 } : agreement;
+  });
+  return { templates: templates.filter(({ id }) => !existing.includes(id)), agreements: projectedAgreements,
+    usage: [...currentUsage.filter(({ agreementId }) => !packageAgreementIds.has(agreementId)), ...packageUsage] };
 }
 
 export function partBoardPriority(input: LessonInput, snapshot: SchedulerSnapshot, records: AvailabilityRecords,
@@ -77,6 +93,33 @@ export function completedPartBoardConflict(input: LessonInput, existing: Lesson)
 export async function scheduleLesson(repository: PlanningRepository, input: LessonInput, existing?: Lesson,
   occurrence?: { recurringTemplateId: string; occurrenceDate: string; agreementId?: string | null },
   batch?: { snapshot: SchedulerSnapshot; records: AvailabilityRecords; agreements: Agreement[]; usage: Usage[] }) {
+  if (!existing && input.lessonType === 'PART_BOARD_RIDE') {
+    const packages = new PlansRepository(repository.client);
+    const agreements = batch?.agreements ?? await repository.agreements();
+    const agreement = agreements.find((entry) => entry.riderId === input.riderId && entry.horseId === input.horseId && effectiveOn(entry, input.date));
+    const enrollment = (await enrollmentDetails(packages, input.date)).find((entry) => entry.agreementId === agreement?.id && entry.effective && entry.entitlements.some((entitlement) => entitlement.activityTypes.includes('PRACTICE_RIDE')));
+    const entitlement = enrollment?.entitlements.find((entry) => entry.activityTypes.includes('PRACTICE_RIDE'));
+    if (enrollment && entitlement && input.consumeEntitlement !== false) {
+      if (!entitlement.remaining) return { conflicts: [{ code: 'ENTITLEMENT_EXHAUSTED', severity: 'ERROR' as const, message: 'This practice-ride package is exhausted.' }] };
+      try {
+        const activity = await saveActivity(repository, packages, { activityType: 'PRACTICE_RIDE', date: input.date, startTime: input.startTime, endTime: input.endTime,
+          coachId: input.coachId, status: input.status, discipline: input.discipline, rideUnits: input.rideUnits, location: '', notes: input.notes ?? '', cancellationAction: 'RETAIN',
+          participants: [{ riderId: input.riderId, horseId: input.horseId, enrollmentId: enrollment.id, entitlementId: entitlement.id, overrideReason: '', relationshipOverrideReason: '' }] });
+        const lessonId = activity.participants[0].lessonId!;
+        let lesson = (await repository.scheduler.lesson(lessonId))!;
+        if (occurrence) {
+          if (repository.client) await repository.client.lesson.update({ where: { id: lessonId }, data: { recurringTemplateId: occurrence.recurringTemplateId, occurrenceDate: new Date(`${occurrence.occurrenceDate}T00:00:00Z`) } });
+          else Object.assign(lesson, { recurringTemplateId: occurrence.recurringTemplateId, occurrenceDate: occurrence.occurrenceDate });
+          lesson = { ...lesson, recurringTemplateId: occurrence.recurringTemplateId, occurrenceDate: occurrence.occurrenceDate };
+        }
+        batch?.snapshot.lessons.push(lesson);
+        return { lesson, conflicts: [] };
+      } catch (error) {
+        if (error instanceof Error && 'code' in error && typeof error.code === 'string') return { conflicts: [{ code: error.code, severity: 'ERROR' as const, message: error.message }] };
+        throw error;
+      }
+    }
+  }
   const [snapshot, records] = batch ? [batch.snapshot, batch.records] : await Promise.all([
     repository.scheduler.snapshot({ start: input.date, end: input.date }), repository.availability(),
   ]);

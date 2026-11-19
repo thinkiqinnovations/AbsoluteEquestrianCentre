@@ -8,6 +8,9 @@ import { compareTemplatePriority, defaultPriority, occurrenceDates, recurringSch
 import { appTimeZone } from './time-zone.js';
 import { id } from './store.js';
 import { validationError } from './validation-error.js';
+import { PlansRepository } from './plans-repository.js';
+import { PlanError, plansWrite, saveEnrollment } from './plans-service.js';
+import { prisma } from './database.js';
 
 export const planningRouter: Router = Router();
 const today = () => barnToday(appTimeZone);
@@ -16,6 +19,7 @@ const route = (handler: (req: Request, res: Response) => Promise<unknown>) =>
   (req: Request, res: Response, next: NextFunction) => {
     void handler(req, res).catch((error: unknown) => {
       if (error instanceof z.ZodError) res.status(400).json({ error: validationError(error) });
+      else if (error instanceof PlanError) res.status(error.status).json({ error: { code: error.code, message: error.message } });
       else next(error);
     });
   };
@@ -28,15 +32,17 @@ planningRouter.get('/part-board', route(async (req, res) => {
   ]);
   const riderNames = new Map(riders.map(({ id, firstName, lastName }) => [id, `${firstName} ${lastName}`]));
   const horseNames = new Map(horses.map(({ id, name }) => [id, name]));
+  const enrollments = await new PlansRepository(prisma).enrollments();
   res.json(agreements.filter((entry) => (!query.horseId || entry.horseId === query.horseId) && (!query.riderId || entry.riderId === query.riderId))
-    .map((entry) => ({ ...entry, riderName: riderNames.get(entry.riderId), horseName: horseNames.get(entry.horseId),
+    .map((entry) => ({ ...entry, planId: enrollments.find((enrollment) => enrollment.agreementId === entry.id && enrollment.status !== 'ENDED')?.planId ?? entry.planId,
+      riderName: riderNames.get(entry.riderId), horseName: horseNames.get(entry.horseId),
       effective: effectiveOn(entry, date), entitlement: entitlement(entry, date, usages), nextPreferredWindow: nextPreferredWindow(entry, date) })));
 }));
 
 const saveAgreement = route(async (req, res) => {
   const fields = agreementSchema.parse(req.body);
   const editId = typeof req.params.id === 'string' ? req.params.id : undefined;
-  return planningWrite(async (repository) => {
+  return plansWrite(async (repository, plans) => {
     const agreements = await repository.agreements();
     const existing = agreements.find((entry) => entry.id === editId);
     if (editId && !existing) return fail(res, 404, 'NOT_FOUND', 'Agreement not found.');
@@ -50,8 +56,23 @@ const saveAgreement = route(async (req, res) => {
       return fail(res, 409, 'PART_BOARD_RELATIONSHIP_LOCKED', 'An agreement with linked rides or templates cannot change rider or horse.');
     }
     const entry: Agreement = { ...fields, id: existing?.id ?? id('agreement') };
+    const packagePlan = fields.planId ? (await plans.plans()).find((plan) => plan.id === fields.planId && plan.category === 'PART_BOARD') : undefined;
+    if (fields.planId && !packagePlan) throw new PlanError('INVALID_PART_BOARD_PLAN', 'Select a part-board package.', 400);
+    if (packagePlan) {
+      entry.entitlementPeriod = 'MONTH';
+      entry.freeRidesPerPeriod = packagePlan.entitlements.find((entitlement) => entitlement.activityTypes.includes('PRACTICE_RIDE'))?.quantity ?? 0;
+    }
     if (capacityExceeded(entry, agreements, maxPartBoarders)) return fail(res, 409, 'PART_BOARD_CAPACITY', 'This horse already has the maximum number of overlapping active agreements, or this rider is already linked.');
     await repository.saveAgreement(entry, Boolean(existing));
+    const enrollments = (await plans.enrollments()).filter((enrollment) => enrollment.agreementId === entry.id && enrollment.status !== 'ENDED');
+    for (const enrollment of enrollments) {
+      if (enrollment.planId !== entry.planId) await plans.saveEnrollment({ ...enrollment, status: 'ENDED', endDate: entry.startDate < enrollment.startDate ? enrollment.startDate : entry.startDate });
+    }
+    if (packagePlan) {
+      const current = enrollments.find((enrollment) => enrollment.planId === packagePlan.id);
+      await saveEnrollment(repository, plans, { id: current?.id ?? id('enrollment'), planId: packagePlan.id, riderId: entry.riderId, agreementId: entry.id,
+        startDate: entry.startDate, endDate: entry.endDate, status: entry.status === 'ACTIVE' ? 'ACTIVE' : entry.status === 'PAUSED' ? 'PAUSED' : 'ENDED', notes: entry.notes ?? '' }, current);
+    }
     return { entry, status: existing ? 200 : 201 };
   }).then((result) => { if ('entry' in result) res.status(result.status).json(result.entry); });
 });

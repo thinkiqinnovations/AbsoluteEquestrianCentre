@@ -95,7 +95,7 @@ it('creates a part-board agreement, manages its status, and reports recurring ge
   expect(document.body.textContent).toContain('1 remaining');
   expect(document.body.textContent).toContain('Preferred times');
   await click('Edit agreement');
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Preferred ride times');
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Schedule Preferences');
   await click('Cancel');
   await click('Pause');
   await waitFor(() => expect(button('Edit agreement')).toBeUndefined());
@@ -126,10 +126,10 @@ it('navigates views, filters and opens month results in the shared lesson workfl
         conflicts: day === date ? [{ lessonId: 'lesson-0', severity: 'ERROR', code: 'HORSE_UNAVAILABLE' }] : [],
       })) };
     }
-    if (url.pathname === '/api/availability/check') body = { RIDER: {}, HORSE: {}, COACH: {} };
-    if (url.pathname === '/api/riders') body = [{ ...person, active: true }];
+    if (url.pathname === '/api/availability/check') body = { RIDER: { emma: { status: 'AVAILABLE' } }, HORSE: {}, COACH: { sarah: { status: 'AVAILABLE' } } };
+    if (url.pathname === '/api/riders') body = [{ ...person, active: false }];
     if (url.pathname === '/api/horses') body = [{ ...lesson.horse, active: true }];
-    if (url.pathname === '/api/coaches') body = [{ ...lesson.coach, active: true }];
+    if (url.pathname === '/api/coaches') body = [{ ...lesson.coach, active: false }];
     if (url.pathname === '/api/recommendations/horses') {
       previews.push(JSON.parse(String(options?.body)));
       const recommendation = { eligible: true, workload: { current: 0, proposed: 1, projected: 1, maximum: 1.5 },
@@ -156,6 +156,10 @@ it('navigates views, filters and opens month results in the shared lesson workfl
   expect(document.body.textContent).toContain('November 2026');
   expect(button('Conflicts · 1')).toBeDefined();
   expect(button('Near capacity · 1')).toBeDefined();
+  const monthEntry = button('Edit Emma Roberts on 2026-11-18 at 15:30');
+  expect(monthEntry?.textContent).toContain('Emma Roberts · Jasper');
+  expect(monthEntry?.textContent).toContain('Conflict');
+  expect(monthEntry?.textContent).toContain('Sarah · Flat · Group');
   expect(document.querySelector('[aria-label="Monthly agenda"]')).toBeTruthy();
   expect(calls.filter((call) => call.endsWith('/month'))).toHaveLength(1);
 
@@ -170,7 +174,13 @@ it('navigates views, filters and opens month results in the shared lesson workfl
   await click('Clear filters');
   await click('Edit Emma Roberts on 2026-11-18 at 15:30');
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Edit Lesson');
+  for (const label of ['Rider', 'Lesson type', 'Discipline', 'Coach', 'Status']) {
+    expect(document.querySelector(`[role="dialog"] [role="combobox"][aria-label="${label}"]`), label).toBeTruthy();
+  }
   await waitFor(() => expect(button('Select Lindon')).toBeDefined());
+  expect(document.querySelector('[role="dialog"] [aria-label="Rider"]')?.textContent).toContain('Emma Roberts · Inactive');
+  expect(document.querySelector('[role="dialog"] [aria-label="Coach"]')?.textContent).toContain('Sarah Bennett · Inactive');
+  expect(document.querySelector('[role="dialog"] [aria-label="Rider"]')?.textContent).not.toContain('Available');
   expect(previews.at(-1)).toMatchObject({ excludeLessonId: 'lesson-0', riderId: 'emma', date });
   expect(document.querySelector('[role="dialog"]')?.textContent).toMatch(/#1 Sassy.*75 points.*Projected workload.*Rider preference rank 1.*#2 Lindon/);
   expect(document.querySelector('[role="dialog"] details')?.textContent).toContain('Rider level is incompatible.');

@@ -5,7 +5,7 @@ import { evaluateAvailability } from './availability.js';
 import { overlaps } from './intervals.js';
 
 it('saves a new coach and their weekly availability in the first request', async () => {
-  vi.stubEnv('DATABASE_URL', undefined);
+  vi.stubEnv('DATABASE_URL', '');
   vi.stubEnv('BILLING_ENABLED', 'false');
   const api = request((await import('./app.js')).app);
   const route = '/api/coaches/with-availability';
@@ -37,7 +37,7 @@ afterEach(() => {
 });
 
 it('serves sample lessons across the current barn week and returns JSON for unknown API routes', async () => {
-  vi.stubEnv('DATABASE_URL', undefined);
+  vi.stubEnv('DATABASE_URL', '');
   vi.stubEnv('BILLING_ENABLED', 'false');
   const { app } = await import('./app.js');
   const { appTimeZone } = await import('./time-zone.js');
@@ -87,7 +87,7 @@ describe('effective availability', () => {
 });
 
 it('validates availability CRUD, lesson edits, and Monday-start schedules', async () => {
-  vi.stubEnv('DATABASE_URL', undefined);
+  vi.stubEnv('DATABASE_URL', '');
   vi.stubEnv('BILLING_ENABLED', 'false');
   const { app } = await import('./app.js');
   const api = request(app);

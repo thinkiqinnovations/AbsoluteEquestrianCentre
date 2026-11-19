@@ -28,7 +28,7 @@ export function LessonHorseRecommendations({ query, value, current, horseName, p
 }) {
   const result = query.data;
   const eligible = result?.recommendations ?? [];
-  const ineligible = result?.ineligible ?? [];
+  const ineligible = (result?.ineligible ?? []).filter((horse) => !horse.reasons.some(({ code }) => code === 'HORSE_INACTIVE'));
   const selected = eligible.some(({ horseId }) => horseId === value);
   const unavailable = ineligible.find(({ horseId }) => horseId === value);
   const apiError = (query.error as { error?: { code?: string; message?: string } } | null)?.error;
@@ -61,7 +61,7 @@ export function LessonHorseRecommendations({ query, value, current, horseName, p
     {result && <>
       <Typography variant="subtitle1" fontWeight={700}>Recommended Horses</Typography>
       {!eligible.length && <Alert severity="warning">{partBoard ? 'Review the agreement and scheduling concerns below for this part-board ride.' : 'Every horse has booking concerns for these lesson details. Review the scores and reasons below.'}</Alert>}
-      {eligible.map((horse) => <Paper key={horse.horseId} variant="outlined" sx={{ p: 1.5, bgcolor: '#fffdf8' }}>
+      {eligible.map((horse) => <Paper key={horse.horseId} variant="outlined" sx={{ p: 1.5, bgcolor: 'background.paper' }}>
         <Stack gap={0.75}>
           <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
             <Typography fontWeight={700}>#{horse.rank} {horse.horseName}</Typography>

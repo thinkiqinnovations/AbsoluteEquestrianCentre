@@ -4,6 +4,9 @@ import { prisma } from '../apps/api/src/database.js';
 import { demoAgreements, demoPartBoardLessons, demoTemplates, demoUsage, PlanningRepository } from '../apps/api/src/planning-repository.js';
 import { demoTimestamp, store } from '../apps/api/src/store.js';
 import { demoLessonPayments, demoMonthlyPayments } from '../apps/api/src/payment-demo.js';
+import { demoPlans, demoEnrollments } from '../apps/api/src/plans-demo.js';
+import { demoActivities, demoActivityLessons, demoPlanUsages } from '../apps/api/src/plans-fixtures.js';
+import { PlansRepository } from '../apps/api/src/plans-repository.js';
 
 async function seed() {
   if (!prisma || process.env.DEMO_SEED !== '1' || process.env.NODE_ENV === 'production' ||
@@ -14,6 +17,14 @@ async function seed() {
   const timestamp = new Date(demoTimestamp);
   await prisma.$transaction(async (db) => {
     const planning = new PlanningRepository(db);
+    const plans = new PlansRepository(db);
+    for (const plan of demoPlans) {
+      const { entitlements, effectiveFrom, effectiveTo, ...fields } = plan;
+      const data = { ...fields, effectiveFrom: civilDate(effectiveFrom), effectiveTo: effectiveTo ? civilDate(effectiveTo) : null };
+      await db.plan.upsert({ where: { id: plan.id }, create: data, update: data });
+      for (const entitlement of entitlements) await db.planEntitlement.upsert({ where: { id: entitlement.id }, create: entitlement, update: entitlement });
+    }
+    if (process.env.CATALOG_ONLY === '1') return;
     for (const { id, createdAt, updatedAt, ...fields } of store.horses) {
       await db.horse.upsert({ where: { id }, create: { id, ...fields, createdAt, updatedAt }, update: { ...fields, updatedAt } });
     }
@@ -94,8 +105,16 @@ async function seed() {
         where: { riderId_month_kind: key }, create: { ...key, status, updatedAt: timestamp }, update: { status, updatedAt: timestamp },
       });
     }
-  }, { timeout: 30000 });
-  console.log('Seeded fictional scheduling, availability, part-board, and recurrence demos.');
+    for (const enrollment of demoEnrollments) await plans.saveEnrollment(enrollment);
+    for (const { activityId: _activity, createdAt, updatedAt, date, occurrenceDate: _occurrence, ...fields } of demoActivityLessons) {
+      void _activity; void _occurrence;
+      const data = { ...fields, date: civilDate(date), updatedAt };
+      await db.lesson.upsert({ where: { id: fields.id }, create: { ...data, createdAt }, update: data });
+    }
+    for (const activity of demoActivities) await plans.saveActivity(activity);
+    for (const usage of demoPlanUsages) await plans.saveUsage(usage);
+  }, { timeout: 120000 });
+  console.log(process.env.CATALOG_ONLY === '1' ? 'Loaded the 14 configured plans without updating scheduling fixtures.' : 'Seeded fictional scheduling, availability, part-board, recurrence, plans, activities, and entitlement demos.');
 }
 
 void seed().catch((error: unknown) => {
